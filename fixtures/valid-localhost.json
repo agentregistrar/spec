@@ -1,0 +1,22 @@
+{
+  "protocol": "agent-identity-v1",
+  "audience": "vaporcloud-local",
+  "provider_name": "VaporCloud (local development)",
+  "provider_url": "http://127.0.0.1:3001",
+  "contact": "http://localhost:3001/contact",
+  "issuer_allowlist": [
+    "http://localhost:3000"
+  ],
+  "required_scopes": [
+    "tos:accept"
+  ],
+  "terms": {
+    "version": "2026.1-dev",
+    "url": "http://localhost:3001/terms",
+    "sha256": "sha256:742411ef4239bcd57809d456fe7676957af1d5d84f456dfe225a55e95e5e97f4",
+    "text": "VaporCloud local development Terms of Service. Not for production use."
+  },
+  "endpoints": {
+    "agent_signup": "http://127.0.0.1:3001/api/signup/agent"
+  }
+}

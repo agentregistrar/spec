@@ -1,0 +1,21 @@
+{
+  "protocol": "agent-identity-v1",
+  "audience": "vaporcloud",
+  "provider_name": "VaporCloud",
+  "issuer_allowlist": [
+    "https://id.agentregistrar.dev"
+  ],
+  "required_scopes": [
+    "tos:accept"
+  ],
+  "terms": {
+    "version": "2026.1",
+    "url": "https://vaporcloud.example/terms",
+    "sha256": "sha256:b99d22d0f1d2bdca8033611de9ac7ef8694e8d18e649a211ef9a4f318f7b9f2d",
+    "text": "VaporCloud Terms of Service, version 2026.1."
+  },
+  "endpoints": {
+    "agent_signup": "https://vaporcloud.example/api/signup/agent"
+  },
+  "__fixture_note": "INVALID: terms.sha256 is a well-formed but WRONG digest for the exact terms.text bytes."
+}

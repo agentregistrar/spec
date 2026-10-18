@@ -1,0 +1,19 @@
+{
+  "protocol": "agent-identity-v1",
+  "audience": "vaporcloud",
+  "provider_name": "VaporCloud",
+  "issuer_allowlist": [],
+  "required_scopes": [
+    "tos:accept"
+  ],
+  "terms": {
+    "version": "2026.1",
+    "url": "https://vaporcloud.example/terms",
+    "sha256": "sha256:036e1298bb740b31a53c6bbef30456f567785e8ed85bb67e199cb888a1f771a4",
+    "text": "VaporCloud Terms of Service, version 2026.1."
+  },
+  "endpoints": {
+    "agent_signup": "https://vaporcloud.example/api/signup/agent"
+  },
+  "__fixture_note": "INVALID: issuer_allowlist is empty; v1 requires at least one issuer origin."
+}

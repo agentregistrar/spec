@@ -1,0 +1,29 @@
+{
+  "protocol": "agent-identity-v1",
+  "audience": "vaporcloud",
+  "provider_name": "VaporCloud",
+  "issuer_allowlist": [
+    "https://id.agentregistrar.dev"
+  ],
+  "required_scopes": [
+    "tos:accept"
+  ],
+  "terms": {
+    "version": "2026.1",
+    "url": "https://vaporcloud.example/terms",
+    "sha256": "sha256:036e1298bb740b31a53c6bbef30456f567785e8ed85bb67e199cb888a1f771a4",
+    "text": "VaporCloud Terms of Service, version 2026.1."
+  },
+  "endpoints": {
+    "agent_signup": "https://vaporcloud.example/api/signup/agent"
+  },
+  "__fixture_note": "INVALID: instance_catalog is a forbidden vendor capability field (removed from v1 discovery).",
+  "instance_catalog": [
+    {
+      "sku": "quantum-toaster-x1",
+      "name": "Quantum Toaster X1",
+      "specs": "420 Qubits",
+      "tier": "free"
+    }
+  ]
+}

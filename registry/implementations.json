@@ -1,0 +1,97 @@
+{
+  "registry": "agent-identity-v1 implementation registry",
+  "description": "Machine-readable registry of Relying Parties whose published discovery document passes the identity-only agent-identity-v1 conformance validator. The human-readable view is registry/README.md; the two are kept in lockstep.",
+  "protocol": "agent-identity-v1",
+  "spec": "agent-identity-v1.md",
+  "registry_criteria": "registry/README.md",
+  "updated_at": "2026-10-17",
+  "capability_vocabulary": [
+    "agent_signup",
+    "post_signup_context"
+  ],
+  "capability_vocabulary_note": "Protocol capabilities only. Vendor features such as provisioning, catalogs, SKUs, pricing, OTP endpoints, and resource APIs are vendor responsibilities documented in the vendor's post-signup guide, not protocol capabilities, and must never appear here.",
+  "validator": {
+    "id": "agent-identity-v1",
+    "version": "1.0.0",
+    "script": "src/validate-discovery.ts",
+    "run": "pnpm validate:discovery <url-or-file> --json",
+    "evidence_note": "The reference_run and fixture_run below are the recorded v1.0.0 release evidence, retained here as historical record. Their commands and paths are shown in this repository's layout; the validator package and renewed runs land in a follow-up spec release.",
+    "reference_run": {
+      "date": "2026-10-17",
+      "command": "pnpm validate:discovery http://localhost:3001/.well-known/agent-signup.json --json",
+      "mode": "url",
+      "source": "http://localhost:3001/.well-known/agent-signup.json",
+      "target": "locally started VaporCloud reference implementation (placeholder environment variables only)",
+      "exit_code": 0,
+      "valid": true,
+      "counts": {
+        "passed": 22,
+        "failed": 0,
+        "warnings": 0,
+        "probes": 0
+      },
+      "observed": {
+        "protocol": "agent-identity-v1",
+        "audience": "vaporcloud",
+        "providerName": "VaporCloud"
+      }
+    },
+    "fixture_run": {
+      "date": "2026-10-17",
+      "command": "pnpm validate:discovery fixtures/valid-full.json --json",
+      "mode": "file",
+      "source": "fixtures/valid-full.json",
+      "target": "checked-in VaporCloud identity-only discovery fixture",
+      "exit_code": 0,
+      "valid": true,
+      "counts": {
+        "passed": 17,
+        "failed": 0,
+        "warnings": 0,
+        "probes": 0
+      },
+      "observed": {
+        "protocol": "agent-identity-v1",
+        "audience": "vaporcloud",
+        "providerName": "VaporCloud"
+      }
+    }
+  },
+  "implementations": [
+    {
+      "name": "VaporCloud",
+      "role": "reference implementation",
+      "url": "https://vaporcloud.example",
+      "discovery_url": "https://vaporcloud.example/.well-known/agent-signup.json",
+      "discovery_url_note": "Intended production discovery URL for the reference implementation. The recorded validator run validated the locally started reference implementation (see validator_evidence.source), not this public URL; this entry is reproducible locally but has not been re-validated from the public internet.",
+      "audience": "vaporcloud",
+      "protocol": "agent-identity-v1",
+      "capabilities": [
+        "agent_signup",
+        "post_signup_context"
+      ],
+      "contact": "security@vaporcloud.example",
+      "post_signup_guide": "https://vaporcloud.example/docs/SKILL.md",
+      "validated_at": "2026-10-17",
+      "validator_version": "1.0.0",
+      "validator_evidence": {
+        "command": "pnpm validate:discovery http://localhost:3001/.well-known/agent-signup.json --json",
+        "mode": "url",
+        "source": "http://localhost:3001/.well-known/agent-signup.json",
+        "exit_code": 0,
+        "valid": true,
+        "counts": {
+          "passed": 22,
+          "failed": 0,
+          "warnings": 0,
+          "probes": 0
+        },
+        "observed": {
+          "protocol": "agent-identity-v1",
+          "audience": "vaporcloud"
+        },
+        "note": "Passed against the locally started VaporCloud reference implementation on 2026-10-17 (counts: 22 passed, 0 failed, 0 warnings). The --json errors and warnings arrays were both empty; numeric totals live under counts. The same discovery builder is also the checked-in fixture fixtures/valid-full.json, which passes in file mode (17 passed, 0 failed, 0 warnings). No live production origin has been validated."
+      }
+    }
+  ]
+}

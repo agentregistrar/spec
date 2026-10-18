@@ -1,0 +1,32 @@
+{
+  "protocol": "agent-identity-v1",
+  "spec": "https://agentregistrar.dev/agent-identity/v1/agent-signup",
+  "audience": "vaporcloud",
+  "provider_name": "VaporCloud",
+  "provider_url": "https://vaporcloud.example",
+  "contact": "security@vaporcloud.example",
+  "updated_at": "2026-10-17T00:00:00Z",
+  "issuer_allowlist": [
+    "https://id.agentregistrar.dev",
+    "https://id.secondbroker.example"
+  ],
+  "required_scopes": [
+    "tos:accept",
+    "signup:free_tier"
+  ],
+  "terms": {
+    "version": "2026.1",
+    "url": "https://vaporcloud.example/terms",
+    "sha256": "sha256:6357f96f625964c2eea9d04e24edfc5098bd9aae3623f5d96e0a441df0025967",
+    "text": "VAPORCLOUD TERMS OF SERVICE & AUTONOMOUS APPLIANCE AGREEMENT\nVersion: 2026.1\n\n1. SERVICE SCOPE. VaporCloud provides mock compute appliances on a free tier.\n2. DELEGATED AGENT IDENTITY. VaporCloud recognizes agent-identity-v1 assertions.\n3. REACHABILITY. The agent's <agent-slug>@<domain> address is a monitored channel.\n4. APPLIANCE SAFETY. Do not toast bagels beyond Shade Level 7.\n\nBy accepting this Agreement you bind your verified human principal to the terms above."
+  },
+  "endpoints": {
+    "agent_signup": "https://vaporcloud.example/api/signup/agent"
+  },
+  "extensions": {
+    "dev.vaporcloud": {
+      "support_url": "https://vaporcloud.example/support",
+      "status_page": "https://status.vaporcloud.example"
+    }
+  }
+}

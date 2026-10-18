@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.agentregistrar.dev/agent-identity/v1/agent-signup.schema.json",
+  "title": "Agent Identity Relying Party Discovery v1 (agent-signup.json)",
+  "description": "Identity-only v1 discovery document served at GET /.well-known/agent-signup.json. It is a parameter document, not a capability catalog: vendor capability surface (instance_catalog, endpoints.provision, endpoints.email_signup, endpoints.verify_otp, endpoints.broker_signup_receipt, SKUs/pricing/resource metadata) is forbidden and rejected. Unknown additive identity fields and namespaced `extensions` metadata are allowed and preserved. Normative definition: agent-identity-v1.md. Kept in lockstep with `AgentSignupDiscoverySchema` in this package (Zod is the source of truth).",
+  "type": "object",
+  "required": [
+    "protocol",
+    "audience",
+    "provider_name",
+    "issuer_allowlist",
+    "required_scopes",
+    "terms",
+    "endpoints"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "protocol": {
+      "description": "Protocol version, major-only. Any other value means the service is unsupported.",
+      "const": "agent-identity-v1"
+    },
+    "audience": {
+      "description": "Stable, case-sensitive service identifier placed verbatim in the assertion `aud`.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^\\S+$"
+    },
+    "provider_name": {
+      "description": "Human-readable service name.",
+      "type": "string",
+      "minLength": 1
+    },
+    "spec": {
+      "description": "Optional absolute URL of the versioned specification.",
+      "$ref": "#/$defs/absoluteProtocolUrl"
+    },
+    "provider_url": {
+      "description": "Optional canonical service URL.",
+      "$ref": "#/$defs/absoluteProtocolUrl"
+    },
+    "contact": {
+      "description": "Optional security/abuse/legal contact: an email address or an absolute http(s) URL.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:[^@\\s]+@[^@\\s]+\\.[^@\\s]+|https://\\S+|http://(?:localhost|127\\.0\\.0\\.1)(?::\\d+)?(?:/\\S*)?)$"
+    },
+    "updated_at": {
+      "description": "Optional ISO 8601 timestamp for human/debuggability. Not a freshness signal for ToS.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "issuer_allowlist": {
+      "description": "Non-empty, unique list of absolute issuer origins accepted by this RP. No path, query, fragment, or wildcard.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/issuerOrigin"
+      }
+    },
+    "required_scopes": {
+      "description": "Unique scopes the RP requires. MUST include `tos:accept` for brokered signup.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "contains": {
+        "const": "tos:accept"
+      }
+    },
+    "terms": {
+      "description": "The ToS the agent is accepting. `text` is the complete agreement; `sha256` is over its exact UTF-8 bytes.",
+      "type": "object",
+      "required": ["version", "url", "sha256", "text"],
+      "additionalProperties": true,
+      "properties": {
+        "version": {
+          "description": "ToS version. MUST change whenever the text changes materially.",
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "description": "Absolute URL (HTTPS, localhost development exception) where a human can read the same agreement.",
+          "$ref": "#/$defs/absoluteProtocolUrl"
+        },
+        "sha256": {
+          "description": "Content hash of the exact UTF-8 bytes of `text`. This JSON Schema enforces only the `sha256:<64 lowercase hex>` format; digest equality with `text` is a cross-field invariant enforced by the shared Zod schema (AgentSignupDiscoverySchema) and by the conformance validator, which recomputes it.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "text": {
+          "description": "The complete ToS text the agent is accepting, not a summary.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "endpoints": {
+      "description": "Signup endpoints. `agent_signup` is the only v1 endpoint; removed vendor endpoints are rejected.",
+      "type": "object",
+      "required": ["agent_signup"],
+      "additionalProperties": true,
+      "properties": {
+        "agent_signup": {
+          "description": "Absolute URL accepting POST with `Authorization: Bearer <assertion>`.",
+          "$ref": "#/$defs/absoluteProtocolUrl"
+        },
+        "provision": false,
+        "email_signup": false,
+        "verify_otp": false,
+        "broker_signup_receipt": false
+      }
+    },
+    "extensions": {
+      "description": "Optional non-capability vendor metadata keyed by reverse-DNS namespace (for example `dev.vaporcloud`). MUST NOT advertise provisioning, catalogs, SKUs, or resource endpoints.",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "instance_catalog": false
+  },
+  "$defs": {
+    "absoluteProtocolUrl": {
+      "description": "Absolute http(s) URL. HTTPS is required except the `http://localhost` / `http://127.0.0.1` development origins.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:https://\\S+|http://(?:localhost|127\\.0\\.0\\.1)(?::\\d+)?(?:/\\S*)?)$"
+    },
+    "issuerOrigin": {
+      "description": "Absolute issuer origin with no path, query, fragment, or wildcard. HTTPS unless localhost development.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:https://[^/?#\\s*]+|http://(?:localhost|127\\.0\\.0\\.1)(?::\\d+)?)/?$"
+    }
+  }
+}
