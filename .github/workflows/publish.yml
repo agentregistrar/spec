@@ -1,0 +1,35 @@
+name: Publish package
+
+# Manual release: bump `version` in package.json, merge to main, then run this
+# workflow from main. Authentication uses npm trusted publishing (OIDC); no
+# NPM_TOKEN secret is involved.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # required for the npm OIDC token exchange
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    # Must match the "Environment name" in the npm trusted publisher settings.
+    environment: npm-publish
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Ensure npm supports trusted publishing
+        # Trusted publishing requires npm >= 11.5.1 (Node >= 22.14).
+        run: npm install --global npm@latest
+
+      - name: Publish
+        run: npm publish --access public
