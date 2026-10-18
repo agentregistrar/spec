@@ -1,6 +1,7 @@
 {
   "name": "@agentregistrar/discovery",
   "version": "1.0.0",
+  "description": "Agent Identity v1 (agent-identity-v1) discovery schema and conformance validator",
   "license": "Apache-2.0",
   "private": false,
   "type": "module",
@@ -10,6 +11,23 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     }
+  },
+  "files": [
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agentregistrar/spec.git"
+  },
+  "keywords": [
+    "agent-identity",
+    "agentregistrar",
+    "discovery",
+    "agent-signup",
+    "conformance"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "validate:discovery": "tsx src/validate-discovery.ts",
