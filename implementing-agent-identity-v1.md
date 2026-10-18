@@ -134,6 +134,31 @@ Deliver the receipt back to the Broker (`POST /api/broker/signup-receipt`, Contr
 it to the agent, which records it with `identity_record_signup`. The Broker persists the context and
 returns `context_url` / `context_sha256` so the agent can fetch the guide itself.
 
+### 5.1 Resolve & recovery
+
+A retry or a repeat signup must not create a second account or a second credential. Resolve the
+account idempotently and signal the outcome:
+
+- **Idempotent resolution.** Key accounts as recommended in `agent-identity-v1.md` §9.1 — `(iss,
+  human.id)` for human-scoped accounts, `(iss, agent.id)` for agent-scoped accounts — and namespace by
+  `iss` whenever you trust more than one issuer. Keying on `human.email` / `agent.email` is **not**
+  recommended; keep it only as a legacy fallback.
+- **Signal resolution.** Return the optional `resolution: "created" | "resolved"` field. `resolved`
+  is a **success**, not an error, and the agent must not re-provision or re-run signup on it.
+- **Show-once credentials.** Return provider credentials **only** when you create the account. On a
+  resolve, omit them — do not re-issue a credential — and point the agent at your recovery path in the
+  guide.
+- **Recovery, not re-signup.** Document a credential recovery/rotation path in your guide (a fresh
+  assertion that resolves the account by `(iss, agent.id)` and issues a new key, invalidating the old
+  one, and never revealing the previous key). Recovery is a vendor operation reached **after** signup,
+  never a discovery or receipt field.
+- **A resolve mints neither mail nor credentials.** On `resolved`, send no duplicate welcome/legal
+  mail. You **may** mint a fresh `signup_token` so a dropped-response retry can still record the
+  receipt.
+
+The wire protocol id stays `agent-identity-v1`; the `resolution` field is additive and `v1.0.0`
+implementors remain conformant. See `agent-identity-v1.md` §7.2, §7.3, §9.1, and §12.5.
+
 ---
 
 ## 6. Publish a post-signup guide instead of advertising capabilities

@@ -1,9 +1,9 @@
 # Agent Identity Relying Party Discovery v1 (`agent-signup.json`)
 
-- **Status:** Normative specification — `v1.0.0`. Maintained in [`agentregistrar/spec`](https://github.com/agentregistrar/spec).
+- **Status:** Normative specification — `v1.1.0`. Maintained in [`agentregistrar/spec`](https://github.com/agentregistrar/spec).
 - **Protocol identifier:** `agent-identity-v1`
 - **Well-known URI:** `GET /.well-known/agent-signup.json`
-- **Version:** `v1.0.0` (see §1.3)
+- **Version:** `v1.1.0` (see §1.3)
 - **Companion document:** [`scope-boundaries.md`](./scope-boundaries.md) — the identity-vs-vendor boundary and the future-change review checklist.
 
 This document is the single normative definition of the `agent-signup.json` discovery contract and the
@@ -34,6 +34,7 @@ MCP OAuth discovery (RFC 9728), the Broker MCP API, and the Broker signup-receip
 
 | Version | Date | Change |
 | :--- | :--- | :--- |
+| `v1.1.0` | 2026-10-18 | Additive clarifications: replay vs resolve (idempotent resolution, `assertion_replayed` reserved for conflicting reuse), the optional `resolution: "created" \| "resolved"` success field, acceptance lifetime, a knowledge-of-text restatement, recommended account identity keys (§9.1), and credential handoff & recovery (§12.5). **No field removals or renames; the wire protocol id stays `agent-identity-v1`; `v1.0.0` implementors remain conformant.** |
 | `v1.0.0` | 2026-10-17 | Initial identity-only v1 specification. Discovery is identity-only; vendor catalogs, provisioning endpoints, legacy OTP endpoints, and broker receipt callbacks are removed from the protocol and are forbidden. Adds the optional signed post-signup `context` pointer. |
 
 **Release record.** `v1.0.0` was recorded on **2026-10-17**, once the identity-only
@@ -45,11 +46,18 @@ including the release evidence and the change process, are in
 implementation registry in [`registry/README.md`](./registry/README.md) (machine-readable:
 [`registry/implementations.json`](./registry/implementations.json)).
 
+**Release record (`v1.1.0`).** `v1.1.0` was recorded on **2026-10-18** as a **text-only, additive**
+revision: it changes no schema/Zod/JSON-Schema, no validator, and no wire-protocol behaviour — it adds
+the optional `resolution` success field and clarifies replay vs resolve, acceptance lifetime,
+account identity keys, and credential handoff & recovery. Release notes, including the
+conformance-validator evidence and the change process, are in
+[`release-notes-v1.1.0.md`](./release-notes-v1.1.0.md). `v1.0.0` implementors remain conformant.
+
 ### 1.3 Version identity
 
 - The protocol version is carried **major-only** in the discovery document's `protocol` field:
   `agent-identity-v1`.
-- This specification is published as `v1.0.0`. Minor/patch revisions are additive and do not change
+- This specification is published as `v1.1.0`. Minor/patch revisions are additive and do not change
   the `protocol` value; breaking changes require a new `protocol` value and a new discovery path (§13).
   Additive v1 changes are recorded in the changelog above and must pass the
   [`scope-boundaries.md`](./scope-boundaries.md) review checklist; the process is written down in
@@ -312,7 +320,9 @@ presented.
 ### 7.1 Handshake
 
 1. The agent obtains an assertion from its Broker for `audience`, `terms.url`, `terms.sha256`, and the
-   `required_scopes`, passing the accepted ToS text so the Broker can verify the hash it records.
+   `required_scopes`, passing the accepted ToS text so the Broker can verify the hash it records. The
+   Broker **MUST** require the caller to demonstrate knowledge of `terms.text` and **MUST** reject a
+   request that does not (the hash check in `identity_prove`; §10).
 2. The agent sends:
 
    ```http
@@ -327,13 +337,19 @@ presented.
    - `iss` is in `issuer_allowlist` (exact match);
    - `aud` equals `audience`;
    - `exp` has not passed (allow at most 60 seconds of clock skew);
-   - `jti` has not already been used for an account creation;
+   - `jti` is not reused in a **conflicting** context: a repeated `jti` for the **same**
+     agent/account at the same service is not a replay and **MUST** resolve idempotently rather than
+     fail as `assertion_replayed` (§7.2);
    - the assertion lifetime is reasonable (recommended maximum 5 minutes);
    - `delegation.scopes` includes every `required_scopes` entry;
    - `human.verified === true`;
    - `delegation.accepted_rp_tos_hash === terms.sha256`.
-4. On success the RP returns `200`/`201` with provider credentials and, where supported, a signed
-   `signup_token` per Contract E (§11) and the optional `context` pointer.
+4. On success the RP returns `200`/`201` with an optional `resolution` field, provider credentials,
+   and, where supported, a signed `signup_token` per Contract E (§11) and the optional `context`
+   pointer. `resolution` is `"created"` when the account was created and `"resolved"` when an
+   existing account was resolved; a `resolved` outcome **MUST NOT** be treated as a failure. When the
+   outcome is `"resolved"`, the RP **MAY** omit provider credentials (show-once — §12.5) but **MUST**
+   point the agent at its credential recovery path in the vendor guide.
 5. On failure the RP returns a 4xx response with a stable machine-readable error code (§7.2).
 
 ### 7.2 Error envelope and stable codes
@@ -360,7 +376,7 @@ The RP **MUST** return errors as a JSON body with a stable machine-readable code
 | `issuer_not_allowed` | `403` | `iss` is not in `issuer_allowlist`. | Do not proceed; the broker is not accepted here. |
 | `audience_mismatch` | `403` | `aud` does not equal `audience`. | Re-discover and mint a correct-audience assertion. |
 | `assertion_expired` | `401` | `exp` has passed beyond allowed skew. | Obtain a new assertion. |
-| `assertion_replayed` | `409` | `jti` was already used for an account creation. | Obtain a new assertion; do not reuse. |
+| `assertion_replayed` | `409` | `jti` was already used in a **conflicting** context (a different agent/account/service). A repeated `jti` for the same agent/account/service is not a replay and resolves idempotently (§7.2). | Obtain a new assertion; do not reuse. |
 | `tos_hash_mismatch` | `409` | Accepted ToS hash is stale or wrong. | Hard stop: re-discover, re-read, re-accept, re-assert (§6.1). |
 | `insufficient_scope` | `403` | Delegated scopes miss a `required_scopes` entry. | Ask the human to re-delegate; do not proceed. |
 | `human_unverified` | `403` | `human.verified` is not `true`. | Complete human verification; do not proceed. |
@@ -369,8 +385,27 @@ The RP **MUST** return errors as a JSON body with a stable machine-readable code
 This mapping is fixed for v1. The invariant is that an agent can distinguish "retry", "re-consent
 ToS", "get a new assertion", and "unsupported" **without parsing prose**.
 
+**Replay vs resolve.** The `jti` check in §7.1 is an **account-creation guard**, not a
+duplicate-suppression mechanism. A repeated `POST` carrying an already-used `jti` for the **same**
+agent/account at the same service **MUST** resolve idempotently — a success (with `resolution:
+"resolved"` where the RP signals it), not `assertion_replayed`. `assertion_replayed` is reserved for a
+`jti` presented in a **conflicting** context (a different agent, account, or service). A Broker **MAY**
+return the identical previously issued (and still unexpired) assertion for an identical request;
+acceptance is the durable legal event and assertions are short-lived proofs. An RP **MUST NOT** treat a
+fresh assertion that references an existing acceptance as a new consent.
+
 Revocation is enforced by the Broker at assertion-minting time. If a Relying Party has an out-of-band
 revocation feed, it **MAY** add an implementation-specific error code, but v1 does not require one.
+
+### 7.3 Acceptance lifetime
+
+- v1 imposes **no protocol-mandated re-acceptance interval**. An acceptance remains the recorded
+  consent for its `terms.sha256` until the terms change (a new `terms.sha256`, requiring fresh
+  acceptance per §6.1) or the human re-consents.
+- A Broker **MAY** impose its own re-acceptance policy (for example, periodically re-confirming the
+  Master Agent Delegation Agreement). If it does, it **SHOULD** document that policy. Such a policy
+  does not change the wire behaviour of `POST endpoints.agent_signup` and does not make an RP
+  responsible for prompting re-acceptance.
 
 ---
 
@@ -425,6 +460,25 @@ RPs **MUST**:
    `url` + `sha256` on successful signup (§12). The RP **MUST NOT** advertise those capabilities in
    discovery or the receipt.
 
+### 9.1 Account identity keys
+
+An RP that resolves signups idempotently needs a stable account key. This section recommends one; it
+does not add a protocol field.
+
+- **Recommended keys.** Key accounts on `(iss, human.id)` for **human-scoped** accounts and on
+  `(iss, agent.id)` for **agent-scoped** accounts. When a service treats one account per human
+  regardless of which agent acted, `(iss, human.id)` is the right key; when each agent gets its own
+  account, use `(iss, agent.id)`.
+- **Emails are discouraged as keys.** Keying on `human.email` or `agent.email` is **NOT RECOMMENDED**.
+  Email addresses are mutable and are not stable identifiers; use them only as a legacy fallback for
+  accounts that predate attribution.
+- **Namespace by issuer.** Whenever more than one issuer is trusted (`issuer_allowlist` has more than
+  one entry), the key **MUST** be namespaced by the assertion's `iss` so that identities from different
+  Brokers cannot collide.
+- **`human.verified` is email verification, not KYC.** The flag means the human owner's email address
+  was verified. It is **not** a know-your-customer or identity-document check, and an RP **MUST NOT**
+  represent it as one.
+
 ---
 
 ## 10. Issuer / JWKS Assumptions
@@ -441,7 +495,9 @@ are part of this specification:
 - The Broker **MUST NOT** mint an assertion when the human is unverified, the Master ToS is unsigned,
   the agent is revoked, or the requested scopes exceed the delegation.
 - The Broker **MUST** require the caller to demonstrate knowledge of the accepted ToS text (the hash
-  check in `identity_prove`) and record the acceptance before returning an assertion.
+  check in `identity_prove`), **MUST** reject a request that does not, and **MUST** record the
+  acceptance before returning an assertion. Knowledge of `terms.text` is a precondition of consent,
+  not merely an integrity check on the document.
 
 Structured issuer objects and hosted JWKS discovery beyond the fixed path are **not** part of v1
 (§16). They may be added as an additive extension later if a real need appears.
@@ -532,6 +588,31 @@ into a resource inventory.
   change. A stale guide is a vendor-operations concern, not a broker failure: the portal shows
   "No post-signup guide provided" rather than inventing a fallback resource view.
 
+### 12.5 Credential handoff & recovery
+
+Provider credentials (for example a vendor API key) are **shown once**, at the signup handoff. The
+protocol draws a firm line between the broker-mediated identity event and the vendor's own credential
+lifecycle:
+
+- **Show-once handoff.** When an RP creates an account it returns the provider credential in the
+  signup response. Provider credentials are vendor scope (§2.2) and are not carried in the signed
+  receipt, the discovery document, or broker storage.
+- **Agents MUST persist at handoff.** An agent **MUST** persist provider credentials to a secure store
+  at the moment of handoff, and **MUST NOT** rely on the conversation, context window, or transcript as
+  storage.
+- **The Broker MUST NOT store provider credentials.** The Broker records the identity/attribution
+  proof (`signup_token`) and the optional `context` pointer; it **MUST NOT** store, proxy, or re-issue
+  provider credentials.
+- **Do not re-run signup for recovery.** An agent **MUST NOT** re-run signup as a credential-recovery
+  mechanism. A repeated signup on an existing account **resolves** the account and does not re-issue
+  credentials.
+- **RPs SHOULD document recovery.** A vendor **SHOULD** document a credential recovery/rotation path
+  in its guide (`context.url`), reached only after signup. Because the recovery path is vendor
+  capability, it stays out of discovery and the receipt, exactly like provisioning.
+- **Resolve does not mint credentials or mail.** A resolve of an existing account **MUST NOT** mint
+  new provider credentials and **MUST NOT** send duplicate welcome/legal mail; a fresh `signup_token`
+  **MAY** be issued so a dropped-response retry can still record the receipt.
+
 ---
 
 ## 13. Versioning, Extension & Deprecation Policy
@@ -557,7 +638,13 @@ into a resource inventory.
 - **Audience confusion:** a single, exact `aud`, stable per service.
 - **ToS substitution:** the agent recomputes the hash from `terms.text`; the RP rejects stale or
   mismatched hashes.
-- **Replay:** `jti` tracking and short assertion lifetimes.
+- **Replay vs resolve:** the `jti` guard is an **account-creation guard**; a repeated identical request
+  for the same agent/account/service resolves idempotently, and `assertion_replayed` is reserved for
+  conflicting reuse. Acceptance is the durable legal event; assertions are short-lived proofs (§7.2,
+  §7.3).
+- **Credential handoff & recovery:** provider credentials are **show-once**; agents persist them at the
+  handoff moment, the Broker never stores them, and recovery is a separate vendor rotation path —
+  never a signup re-run (§12.5).
 - **Prompt injection:** discovery content, legal text, and the vendor guide are data, never
   instructions.
 - **Post-signup context:** the URL stays on the vendor's registrable domain, uses HTTPS, is
@@ -594,6 +681,11 @@ into a resource inventory.
       discovery.
 - [ ] `signup_token` (Contract E) contains identity facts, an opaque `service.account_id`, ToS facts,
       and optional `context` — and no `instance_sku` / `endpoint_url`.
+- [ ] A repeated signup for an existing account, keyed as recommended in §9.1, resolves idempotently:
+      it returns `resolution: "resolved"`, does not re-issue provider credentials, and sends no
+      duplicate welcome/legal mail (**SHOULD**; §7.2, §12.5).
+- [ ] The vendor guide documents a credential recovery/rotation path reached **after** signup, and
+      that path is not advertised in discovery or the receipt (**SHOULD**; §12.5).
 
 ### 15.2 Minimal conformant document
 
@@ -606,9 +698,14 @@ may be omitted until a rendered copy exists.
 ## 16. Open Questions (non-blocking)
 
 These items do **not** block v1. They are recorded so later revisions can address them deliberately.
+The `v1.1.0` revision resolved the replay-versus-resolve and credential-handoff questions (see §7.2
+and §12.5); canonical hosting remains open.
 
 | Question | v1 position |
 | :--- | :--- |
+| Is a repeated signup with an already-used `jti` an error? | Resolved in `v1.1.0`: a repeated request for the **same** agent/account/service resolves idempotently; `assertion_replayed` is reserved for a conflicting context (§7.2). |
+| How long does a ToS acceptance last? | Resolved in `v1.1.0`: no protocol-mandated re-acceptance interval; an acceptance lasts until the terms change or the human re-consents. A Broker **MAY** impose its own documented policy (§7.3). |
+| How are provider credentials handed off and recovered? | Resolved in `v1.1.0`: credentials are **show-once** at signup and never stored by the Broker; recovery is a vendor rotation path documented in the guide, never a signup re-run (§12.5). |
 | IANA registration of the well-known URI. | Evaluate after v1 stabilizes; do **not** block v1. |
 | Final canonical public hosting URL for this specification. | This repository is the canonical location of the specification until a rendered copy exists in the documentation site. The optional `spec` field points at a versioned copy and **stays OPTIONAL**; the placeholder `https://<canonical-spec-host>/agent-identity/v1/agent-signup` is illustrative only. |
 | A future alias such as `agent-identity.json`. | Keep `agent-signup.json` for v1; consider an alias in v2. |
