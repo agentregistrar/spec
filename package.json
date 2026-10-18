@@ -1,6 +1,6 @@
 {
   "name": "@agentregistrar/discovery",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Agent Identity v1 (agent-identity-v1) discovery schema and conformance validator",
   "license": "Apache-2.0",
   "private": false,
@@ -13,7 +13,8 @@
     }
   },
   "files": [
-    "src"
+    "src",
+    "agent-signup.schema.json"
   ],
   "repository": {
     "type": "git",
