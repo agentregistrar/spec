@@ -49,6 +49,14 @@ reference implementation (`validator_evidence.source`). The entry is reproducibl
 yet re-validatable from the public internet. New third-party entries must meet criterion 2 as
 written.
 
+**Live re-validation (2026-10-18).** The deployed reference implementation was re-validated live with
+the self-contained `@agentregistrar/discovery` validator —
+`pnpm validate:discovery <discovery-url> --json --probe-jwks` — reporting `valid: true`, `exit 0`,
+zero errors, zero warnings, 22 checks passed, and a passing issuer JWKS probe. This note does **not**
+refresh the published entry: publishing the live demo URL awaits operator approval, so the VaporCloud
+entry in §3 keeps its illustrative `.example` URLs and the reference-entry exception above remains in
+force.
+
 ## 3. Registered implementations
 
 The table below is kept **in lockstep** with [`implementations.json`](./implementations.json) — that

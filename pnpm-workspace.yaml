@@ -1,0 +1,4 @@
+# pnpm settings for the @agentregistrar/discovery package.
+# tsx runs on esbuild, whose install script must be approved to run.
+allowBuilds:
+  esbuild: true

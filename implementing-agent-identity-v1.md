@@ -167,6 +167,12 @@ Exit codes: `0` valid, `1` invalid document, `2` could not fetch. The validator 
 capability fields at any depth (including under `extensions`) and recomputes the ToS hash. A
 validator-passing document is the objective entry criterion for the implementation registry.
 
+The validator is the source-first package `@agentregistrar/discovery` (`1.0.0`, **Apache-2.0**);
+**npm publishing is pending** (the `@agentregistrar` scope is reservation-only), so run it from a
+clone of this specification repository or through a pinned git dependency
+(`github:agentregistrar/spec#v1.0.0`). There is no `bin` entry — always invoke it with
+`pnpm validate:discovery`.
+
 Optionally, non-destructively probe your issuers/endpoint:
 
 ```bash

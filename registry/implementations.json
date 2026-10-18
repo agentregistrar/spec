@@ -4,7 +4,7 @@
   "protocol": "agent-identity-v1",
   "spec": "agent-identity-v1.md",
   "registry_criteria": "registry/README.md",
-  "updated_at": "2026-10-17",
+  "updated_at": "2026-10-18",
   "capability_vocabulary": [
     "agent_signup",
     "post_signup_context"
@@ -15,7 +15,7 @@
     "version": "1.0.0",
     "script": "src/validate-discovery.ts",
     "run": "pnpm validate:discovery <url-or-file> --json",
-    "evidence_note": "The reference_run and fixture_run below are the recorded v1.0.0 release evidence, retained here as historical record. Their commands and paths are shown in this repository's layout; the validator package and renewed runs land in a follow-up spec release.",
+    "evidence_note": "The reference_run and fixture_run below are the recorded v1.0.0 release evidence, retained here as historical record. The self-contained validator package (@agentregistrar/discovery, Apache-2.0, source-first) now lives in this repository under src/; fixture_run shows its command in this repository's layout. A live re-validation of the deployed reference implementation was performed on 2026-10-18 with this package (valid: true, exit 0, zero failures); publishing the live entry here awaits operator approval, so the VaporCloud entry below keeps its illustrative .example URLs.",
     "reference_run": {
       "date": "2026-10-17",
       "command": "pnpm validate:discovery http://localhost:3001/.well-known/agent-signup.json --json",
@@ -90,7 +90,7 @@
           "protocol": "agent-identity-v1",
           "audience": "vaporcloud"
         },
-        "note": "Passed against the locally started VaporCloud reference implementation on 2026-10-17 (counts: 22 passed, 0 failed, 0 warnings). The --json errors and warnings arrays were both empty; numeric totals live under counts. The same discovery builder is also the checked-in fixture fixtures/valid-full.json, which passes in file mode (17 passed, 0 failed, 0 warnings). No live production origin has been validated."
+        "note": "Passed against the locally started VaporCloud reference implementation on 2026-10-17 (counts: 22 passed, 0 failed, 0 warnings). The --json errors and warnings arrays were both empty; numeric totals live under counts. The same discovery builder is also the checked-in fixture fixtures/valid-full.json, which passes in file mode (17 passed, 0 failed, 0 warnings). A live re-validation of the deployed reference implementation was performed on 2026-10-18 (see registry/README.md §2); its live URL is not published here pending operator approval."
       }
     }
   ]

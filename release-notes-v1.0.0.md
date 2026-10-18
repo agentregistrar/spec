@@ -25,6 +25,7 @@ The release is recorded once the following artifacts agree on the same identity-
 | Conformance validator | `src/validate-discovery.ts` (`pnpm validate:discovery …`) | Objective conformance check; `validatorVersion` `1.0.0`. |
 | Reference implementation | VaporCloud (reference Relying Party, maintained in the private repository) | Identity-only discovery document + post-signup `context` handoff. |
 | Implementation registry | [`registry/implementations.json`](./registry/implementations.json) and [`registry/README.md`](./registry/README.md) | Adoption surface and conformance badge. |
+| Public package | [`package.json`](./package.json) — `@agentregistrar/discovery` `1.0.0` | Self-contained, source-first distribution of the canonical schema (`src/schema.ts`) and the validator CLI (`src/validate-discovery.ts`); **Apache-2.0**. npm publishing is **pending** (scope reservation only); consume it via this repository or `github:agentregistrar/spec#v1.0.0` (no `bin` entry). |
 
 ### Protocol surface at v1.0.0 (summary)
 

@@ -1,6 +1,11 @@
 # Discovery Conformance Validator (`agent-identity-v1`)
 
 - **Source:** `src/validate-discovery.ts` — run with `pnpm validate:discovery`.
+- **Package:** `@agentregistrar/discovery` `1.0.0`, licensed **Apache-2.0**. It is
+  self-contained and source-first: `pnpm install` from a clean clone, then run the CLI. npm publishing
+  is **pending** (the `@agentregistrar` scope is reservation-only); consume the package from this
+  repository or through a pinned git dependency (`github:agentregistrar/spec#v1.0.0`). There is no
+  `bin` entry — invoke it with `pnpm validate:discovery`.
 - **Normative references:** [`agent-identity-v1.md`](./agent-identity-v1.md),
   [`scope-boundaries.md`](./scope-boundaries.md).
 - The validator is the objective mechanism behind the rule “a Relying Party that claims

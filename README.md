@@ -23,7 +23,7 @@ protocol.
 | [`agent-signup.schema.json`](./agent-signup.schema.json) | JSON Schema for the discovery document. |
 | [`fixtures/`](./fixtures) | Conformance fixtures (`valid-*` / `invalid-*`). |
 | [`registry/`](./registry) | Implementation registry (human-readable + machine-readable). |
-| `src/` | `AgentSignupDiscoverySchema` (Zod) and the conformance validator CLI. |
+| `src/` | `@agentregistrar/discovery` — canonical `AgentSignupDiscoverySchema` (Zod) and the conformance validator CLI. |
 
 ## Quick start
 
@@ -46,6 +46,20 @@ pnpm --silent validate:discovery https://example.com/.well-known/agent-signup.js
 The validator source is `src/validate-discovery.ts`; the checked-in fixtures live in
 [`fixtures/`](./fixtures). Exit codes: `0` valid, `1` invalid document, `2` could not fetch.
 See the [validator guide](./validator.md) for the full flag and `--json` reference.
+
+## Package
+
+`@agentregistrar/discovery` (**`1.0.0`**, **Apache-2.0**) is the self-contained package in this
+repository. It has no private dependencies:
+
+- `src/schema.ts` — the canonical `AgentSignupDiscoverySchema` (Zod) plus the `sha256:` hash
+  helper; `src/index.ts` re-exports it.
+- `src/validate-discovery.ts` — the conformance validator CLI (`pnpm validate:discovery`).
+
+It is **source-first**: consumers use it through this repository or a pinned git dependency
+(`github:agentregistrar/spec#v1.0.0`). **npm publishing is pending** (the `@agentregistrar` scope is
+reservation-only), and the package declares no `bin` entry — run the CLI with
+`pnpm validate:discovery`.
 
 ## Specification release
 
