@@ -106,8 +106,12 @@ specification version — `package.json` `version` bumped `1.0.2` → `1.1.0` �
 
 - Workflow: [`.github/workflows/publish.yml`](./.github/workflows/publish.yml) (`workflow_dispatch`) on
   repository `agentregistrar/spec`, environment `npm-publish`, `id-token: write`.
-- Publish run: `PENDING_RUN_ID` (conclusion: `PENDING_CONCLUSION`).
-- Evidence: `npm view @agentregistrar/discovery@1.1.0 version`.
+- Publish run: [`39168886677`](https://github.com/agentregistrar/spec/actions/runs/39168886677) —
+  `Publish package` on `main`, conclusion **success**.
+- Evidence: the run log records `+ @agentregistrar/discovery@1.1.0` with a signed provenance statement
+  published to the transparency log; the registry reports `dist-tags.latest = 1.1.0` with version
+  `1.1.0` present, and `npm view @agentregistrar/discovery@1.1.0 version` → `1.1.0` once upload
+  processing completes.
 
 This release is **text-only** — no schema/Zod/JSON-Schema and no validator change — so no npm publish
 is required for conformance; the version alignment is an operator decision so the published package
