@@ -49,17 +49,26 @@ See the [validator guide](./validator.md) for the full flag and `--json` referen
 
 ## Package
 
-`@agentregistrar/discovery` (**`1.0.0`**, **Apache-2.0**) is the self-contained package in this
-repository. It has no private dependencies:
+`@agentregistrar/discovery` (**`1.0.1`**, **Apache-2.0**) is published to npm and is the
+self-contained package in this repository. It has no private dependencies:
 
 - `src/schema.ts` — the canonical `AgentSignupDiscoverySchema` (Zod) plus the `sha256:` hash
   helper; `src/index.ts` re-exports it.
 - `src/validate-discovery.ts` — the conformance validator CLI (`pnpm validate:discovery`).
+- `agent-signup.schema.json` — the checked-in JSON Schema, shipped so the packaged validator runs
+  its Zod/JSON-Schema agreement check outside this repository.
 
-It is **source-first**: consumers use it through this repository or a pinned git dependency
-(`github:agentregistrar/spec#v1.0.0`). **npm publishing is pending** (the `@agentregistrar` scope is
-reservation-only), and the package declares no `bin` entry — run the CLI with
-`pnpm validate:discovery`.
+It is **source-first**: the npm tarball ships the TypeScript sources (no build step), so consumers
+need a toolchain that transpiles dependencies (for example Next.js `transpilePackages` or `tsx`),
+or they can use the pinned git dependency (`github:agentregistrar/spec#v1.0.0`). The package
+declares no `bin` entry — run the CLI with `pnpm validate:discovery`.
+
+### Releasing the package
+
+Publishing uses **npm trusted publishing (OIDC)** — no long-lived npm token. Bump `version` in
+`package.json`, merge to `main`, then run the `Publish package` workflow
+(`.github/workflows/publish.yml`, environment `npm-publish`) from `main`. Provenance is generated
+automatically.
 
 ## Specification release
 
