@@ -632,7 +632,7 @@ function deepEqual(a: unknown, b: unknown): boolean {
 // The checked-in JSON Schema declares `updated_at` as `format: date-time`. A
 // real `ajv` + `ajv-formats` run evaluates that format, so this subset
 // evaluator mirrors it in order to keep its Zod-divergence signal honest
-// instead of claiming an agreement it cannot check (review wave4-07 MINOR-1).
+// instead of claiming an agreement it cannot check.
 //
 // It is deliberately NOT the same predicate as the authoritative Zod
 // `z.string().datetime({ offset: true })` used by `AgentSignupDiscoverySchema`:
@@ -1073,7 +1073,7 @@ function checkAgentSignup(document: Record<string, unknown>): Check {
  * offset). The two are intentionally not forced into agreement: Zod and the
  * written spec are authoritative, and `isJsonSchemaDateTime` mirrors the JSON
  * Schema side so the `schema.json-schema` check surfaces divergence rather than
- * overstating agreement (review wave4-07 MINOR-1).
+ * overstating agreement.
  */
 function isValidUpdatedAt(value: unknown): boolean {
   return AgentSignupDiscoverySchema.shape.updated_at.safeParse(value).success;
@@ -1225,7 +1225,7 @@ function buildMetadata(document: Record<string, unknown>): DocumentMetadata {
  * `null` in file mode). It gates the probes' development exception: a
  * body-derived target on a loopback/link-local/private hostname, and any plain
  * `http://` target, is only probed when the input itself is a
- * localhost/127.0.0.1 origin (review wave4-07-03 MINOR-2 and wave4-07 MINOR-2).
+ * localhost/127.0.0.1 origin.
  */
 async function checkDocument(
   document: unknown,
@@ -1432,13 +1432,13 @@ function isLoopbackOrPrivateHostname(rawHostname: string): boolean {
  *
  * 1. A plain `http:` target is refused unless the top-level input origin itself
  *    is a localhost/127.0.0.1 development origin *and* the target is a
- *    localhost/127.0.0.1 host (review wave4-07-03 MINOR-2).
+ *    localhost/127.0.0.1 host.
  * 2. A target on a loopback/link-local/private hostname is refused **regardless
  *    of scheme** unless the top-level input origin itself is a
  *    localhost/127.0.0.1 development origin, so a document served from a public
  *    origin can never steer an opt-in probe at `https://127.0.0.1/`,
- *    `https://10.0.0.5/`, `https://169.254.169.254/`, `https://foo.local/`, etc.
- *    (review wave4-07 MINOR-2).
+ *    `https://10.0.0.5/`, `https://169.254.169.254/`, `https://foo.local/`,
+ *    etc.
  *
  * This is a hostname-string check only: it does not resolve DNS, so it does not
  * defend against DNS rebinding (a public hostname that resolves to a private
@@ -1552,7 +1552,7 @@ async function probeJwks(
  * status outside the accepted set) fail, because `404` at the advertised signup
  * path signals the service does not implement it; `2xx`/`3xx`, `405`
  * (VaporCloud answers `HEAD` with `405`), and `401`/`403` (auth-gated but
- * routed) count as reachable. Review wave4-07-03 MINOR-1.
+ * routed) count as reachable.
  */
 function isEndpointProbeReachable(status: number): boolean {
   return (
