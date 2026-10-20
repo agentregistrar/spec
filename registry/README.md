@@ -2,7 +2,7 @@
 
 - **Status:** Published.
 - **Machine-readable registry (canonical source):** [`implementations.json`](./implementations.json)
-- **Specification:** [`../agent-identity-v1.md`](../agent-identity-v1.md) — released as **v1.0.0** on 2026-10-17 ([release notes](../release-notes-v1.0.0.md)).
+- **Specification:** [`../agent-identity-v1.md`](../agent-identity-v1.md) — released as **v1.1.0** on 2026-10-18 ([release notes](../release-notes-v1.1.0.md)); the initial **v1.0.0** release (2026-10-17) is in [its release notes](../release-notes-v1.0.0.md).
 - **Conformance validator:** `src/validate-discovery.ts` — run as `pnpm validate:discovery <url-or-file> --json` ([validator guide](../validator.md)).
 - **Implementation guide:** [`../implementing-agent-identity-v1.md`](../implementing-agent-identity-v1.md).
 
@@ -131,7 +131,7 @@ Markdown equivalent:
 Both render as **agent-identity-v1 conformant**. The specification is not yet hosted at a final
 canonical URL, so this repository is the **canonical location** (see the
 [spec §1.3](../agent-identity-v1.md) and
-[release notes](../release-notes-v1.0.0.md)); substitute the canonical URL for
+[release notes](../release-notes-v1.1.0.md)); substitute the canonical URL for
 the `<…>` placeholders once hosting exists. In-repo, the link targets are
 [`agent-identity-v1.md`](../agent-identity-v1.md) and §2 of this document.
 
@@ -152,10 +152,11 @@ the `<…>` placeholders once hosting exists. In-repo, the link targets are
 
 | Artifact | Location |
 | :--- | :--- |
-| Specification (`v1.0.0`) | [`../agent-identity-v1.md`](../agent-identity-v1.md) |
+| Specification (`v1.1.0`) | [`../agent-identity-v1.md`](../agent-identity-v1.md) |
 | Scope boundaries rulebook | [`../scope-boundaries.md`](../scope-boundaries.md) |
 | Conformance validator guide | [`../validator.md`](../validator.md) |
 | Implementation guide (new RPs) | [`../implementing-agent-identity-v1.md`](../implementing-agent-identity-v1.md) |
+| Release notes (`v1.1.0`) | [`../release-notes-v1.1.0.md`](../release-notes-v1.1.0.md) |
 | Release notes (`v1.0.0`) | [`../release-notes-v1.0.0.md`](../release-notes-v1.0.0.md) |
 | Machine-readable registry | [`./implementations.json`](./implementations.json) |
 

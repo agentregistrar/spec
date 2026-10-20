@@ -15,7 +15,7 @@
     "version": "1.0.0",
     "script": "src/validate-discovery.ts",
     "run": "pnpm validate:discovery <url-or-file> --json",
-    "evidence_note": "The reference_run and fixture_run below are the recorded v1.0.0 release evidence, retained here as historical record. The self-contained validator package (@agentregistrar/discovery, Apache-2.0, source-first) now lives in this repository under src/; fixture_run shows its command in this repository's layout. A live re-validation of the deployed reference implementation was performed on 2026-10-18 with this package (valid: true, exit 0, zero failures); publishing the live entry here awaits operator approval, so the VaporCloud entry below keeps its illustrative .example URLs.",
+    "evidence_note": "The reference_run and fixture_run below are the recorded v1.0.0 release evidence, retained here as historical record. The self-contained validator package (@agentregistrar/discovery, Apache-2.0, source-first) now lives in this repository under src/; fixture_run shows its command in this repository's layout. A live re-validation of the deployed reference implementation was performed on 2026-10-18 with this package (valid: true, exit 0, zero failures); publishing the live entry here awaits operator approval, so the VaporCloud entry below keeps its illustrative .example URLs. The current released package is @agentregistrar/discovery 1.1.0 (npm latest); the version fields recorded below are the historical 2026-10-17 v1.0.0 run evidence and are intentionally unchanged.",
     "reference_run": {
       "date": "2026-10-17",
       "command": "pnpm validate:discovery http://localhost:3001/.well-known/agent-signup.json --json",
