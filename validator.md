@@ -1,11 +1,15 @@
 # Discovery Conformance Validator (`agent-identity-v1`)
 
 - **Source:** `src/validate-discovery.ts` — run with `pnpm validate:discovery`.
-- **Package:** `@agentregistrar/discovery` `1.0.0`, licensed **Apache-2.0**. It is
-  self-contained and source-first: `pnpm install` from a clean clone, then run the CLI. npm publishing
-  is **pending** (the `@agentregistrar` scope is reservation-only); consume the package from this
-  repository or through a pinned git dependency (`github:agentregistrar/spec#v1.0.0`). There is no
+- **Package:** `@agentregistrar/discovery` `1.1.0`, licensed **Apache-2.0**. It is
+  self-contained and source-first: `pnpm install` from a clean clone, then run the CLI. It is
+  published to npm (`latest` `1.1.0`): install it with `npm install @agentregistrar/discovery`, or
+  consume it from this repository or through a pinned git dependency
+  (`github:agentregistrar/spec#v1.1.0`). There is no
   `bin` entry — invoke it with `pnpm validate:discovery`.
+  The package release (`1.1.0`) and the `validatorVersion` string the CLI emits (`"1.0.0"`) differ:
+  `v1.1.0` was a text-only spec revision that changed no validator code, and the emitted constant is
+  the validator's own version, not the package version.
 - **Normative references:** [`agent-identity-v1.md`](./agent-identity-v1.md),
   [`scope-boundaries.md`](./scope-boundaries.md).
 - The validator is the objective mechanism behind the rule “a Relying Party that claims
@@ -155,7 +159,7 @@ warnings only, so producers can evolve additively without silently losing visibi
 | Field | Type | Notes |
 | :--- | :--- | :--- |
 | `validator` | string | Always `"agent-identity-v1"`. |
-| `validatorVersion` | string | Validator release, currently `"1.0.0"`. |
+| `validatorVersion` | string | The `VALIDATOR_VERSION` constant emitted by the CLI, currently `"1.0.0"` (unchanged by the text-only `v1.1.0` spec release; the npm package itself is `1.1.0`). |
 | `mode` | `"file"` \| `"url"` | How the document was obtained. |
 | `source` | string | The path or URL that was validated. |
 | `valid` | boolean | `true` iff `exitCode === 0`. |

@@ -19,7 +19,8 @@ protocol.
 | [`scope-boundaries.md`](./scope-boundaries.md) | Identity-vs-vendor scope rulebook and future-change checklist. |
 | [`implementing-agent-identity-v1.md`](./implementing-agent-identity-v1.md) | Relying Party implementation guide. |
 | [`validator.md`](./validator.md) | Conformance validator guide. |
-| [`release-notes-v1.0.0.md`](./release-notes-v1.0.0.md) | Release notes for `v1.0.0`. |
+| [`release-notes-v1.1.0.md`](./release-notes-v1.1.0.md) | Release notes for `v1.1.0` (current). |
+| [`release-notes-v1.0.0.md`](./release-notes-v1.0.0.md) | Release notes for `v1.0.0` (initial release). |
 | [`agent-signup.schema.json`](./agent-signup.schema.json) | JSON Schema for the discovery document. |
 | [`fixtures/`](./fixtures) | Conformance fixtures (`valid-*` / `invalid-*`). |
 | [`registry/`](./registry) | Implementation registry (human-readable + machine-readable). |
@@ -49,7 +50,7 @@ See the [validator guide](./validator.md) for the full flag and `--json` referen
 
 ## Package
 
-`@agentregistrar/discovery` (**`1.0.2`**, **Apache-2.0**) is published to npm and is the
+`@agentregistrar/discovery` (**`1.1.0`**, **Apache-2.0**) is published to npm and is the
 self-contained package in this repository. It has no private dependencies:
 
 - `src/schema.ts` — the canonical `AgentSignupDiscoverySchema` (Zod) plus the `sha256:` hash
@@ -61,7 +62,7 @@ self-contained package in this repository. It has no private dependencies:
 It is **source-first**: installable with `npm install @agentregistrar/discovery`, and the npm
 tarball ships the TypeScript sources (no build step). Consumers therefore need a toolchain that
 transpiles dependencies (for example Next.js `transpilePackages` or `tsx`), or they can use the
-pinned git dependency (`github:agentregistrar/spec#v1.0.0`). The package declares no `bin` entry —
+pinned git dependency (`github:agentregistrar/spec#v1.1.0`). The package declares no `bin` entry —
 run the CLI with `pnpm validate:discovery`.
 
 ### Releasing the package
@@ -73,8 +74,14 @@ automatically.
 
 ## Specification release
 
-`agent-identity-v1` **`v1.0.0`** was released on **2026-10-17**. See the
-[release notes](./release-notes-v1.0.0.md) for what the release freezes and the change process.
+`agent-identity-v1` **`v1.1.0`** was released on **2026-10-18** — an additive, text-only revision
+that adds the optional `resolution` success field and clarifies replay vs resolve, acceptance
+lifetime, account identity keys, and credential handoff & recovery. No fields were removed or
+renamed, the wire protocol id stays `agent-identity-v1`, and `v1.0.0` implementors remain
+conformant. See the [v1.1.0 release notes](./release-notes-v1.1.0.md).
+
+The initial **`v1.0.0`** release (2026-10-17) and the change process are recorded in the
+[v1.0.0 release notes](./release-notes-v1.0.0.md).
 
 ## Documentation
 
