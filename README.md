@@ -85,8 +85,17 @@ The initial **`v1.0.0`** release (2026-10-17) and the change process are recorde
 
 ## Documentation
 
-- Usage and integration guides: <https://docs.agentregistrar.dev> (content arriving).
-- Agent Registrar product and service: <https://agentregistrar.dev>.
+This repository remains the canonical location of the specification. The
+rendered protocol pages are generated from the `v1.1.0` tag:
+
+- Rendered specification: <https://docs.agentregistrar.dev/agent-identity/v1/specification/>
+- Scope boundaries: <https://docs.agentregistrar.dev/agent-identity/v1/scope-boundaries/>
+- Implementation guide: <https://docs.agentregistrar.dev/agent-identity/v1/implementation-guide/>
+- Validator guide: <https://docs.agentregistrar.dev/agent-identity/v1/validator/>
+- Changelog: <https://docs.agentregistrar.dev/agent-identity/v1/changelog/>
+- JSON Schema: <https://docs.agentregistrar.dev/agent-identity/v1/agent-signup.schema.json>
+- Usage and integration guides: <https://docs.agentregistrar.dev>
+- Agent Registrar product and service: <https://agentregistrar.dev>
 
 ## Contributing
 

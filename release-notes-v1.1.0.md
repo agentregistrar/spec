@@ -127,6 +127,7 @@ version tracks the specification version.
 
 ## 7. Related artifacts
 
+- Rendered release notes and changelog: <https://docs.agentregistrar.dev/agent-identity/v1/changelog/>
 - Normative spec: [`agent-identity-v1.md`](./agent-identity-v1.md)
 - Scope rulebook: [`scope-boundaries.md`](./scope-boundaries.md)
 - Implementation guide: [`implementing-agent-identity-v1.md`](./implementing-agent-identity-v1.md)
