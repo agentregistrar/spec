@@ -19,7 +19,7 @@ catalog, provisioning, or resource surface in the protocol.
 | [`scope-boundaries.md`](./scope-boundaries.md) | Identity-vs-vendor scope rulebook, including RP identity, and the future-change checklist. |
 | [`implementing-agent-identity-v1.md`](./implementing-agent-identity-v1.md) | Relying Party implementation guide (provider identity, attestation, receipts, abuse). |
 | [`validator.md`](./validator.md) | Conformance, attestation, fixture, and registry validator guide. |
-| [`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md) | Release notes for `v1.2.0` (current). |
+| [`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md) | Release notes for the `v1.2.0` release (this branch). |
 | [`release-notes-v1.1.0.md`](./release-notes-v1.1.0.md) | Release notes for `v1.1.0`. |
 | [`release-notes-v1.0.0.md`](./release-notes-v1.0.0.md) | Release notes for `v1.0.0` (initial release). |
 | [`agent-signup.schema.json`](./agent-signup.schema.json) | JSON Schema for the discovery document (includes optional `rp_attestation`). |
@@ -68,19 +68,21 @@ pnpm validate:registry registry/implementations.json --json
 
 The validator source is `src/validate-discovery.ts`; the checked-in fixtures live in
 [`fixtures/`](./fixtures). Exit codes: `0` valid / no required check failed, `1` conformance or
-required-verification failure, `2` could not obtain what the run needed (document or JWKS). See the
+required-verification failure (including unparseable JSON), `2` could not obtain what the run needed
+(document or JWKS) with no conformance verdict (`DOCUMENT: NOT CHECKED`). See the
 [validator guide](./validator.md) for the full flag and `--json` reference. Conformance and
 attestation verification are reported separately: a document can be **conformant and unverified**.
 
 ## Package
 
-`@agentregistrar/discovery` (**`1.2.0`**, **Apache-2.0**) is published to npm and is the
-self-contained package in this repository. It has no private dependencies:
+`@agentregistrar/discovery` (**`1.2.0`**, **Apache-2.0**) is the self-contained package in this
+repository. It has no private dependencies:
 
 - `src/schema.ts` — the canonical Zod schemas: `AgentSignupDiscoverySchema`, `RpAttestationClaimsSchema`,
   `RpAttestationKeySchema`, `RpAttestationHeaderSchema`, `AttestationStatusValueSchema`,
-  `AttestationStatusClaimsSchema`, `AttestationStatusResponseSchema`, `BrokerMetadataSchema`, plus the
-  producer/verifier parsers `parseRpAttestationProducer` and `parseRpAttestationVerifier`.
+  `AttestationStatusClaimsSchema`, `AttestationStatusClaimsVerifierSchema`,
+  `AttestationStatusResponseSchema`, `BrokerMetadataSchema`, plus the producer/verifier parsers
+  `parseRpAttestationProducer`, `parseRpAttestationVerifier`, and `parseAttestationStatusVerifier`.
   `src/index.ts` re-exports them.
 - `src/validate-discovery.ts` — the conformance + attestation validator CLI (`pnpm validate:discovery`).
 - `src/validate-fixtures.ts`, `src/validate-registry.ts` — manual harnesses (`pnpm validate:fixtures`,
@@ -93,11 +95,11 @@ self-contained package in this repository. It has no private dependencies:
 
 The six protocol schemas and the registry schema are listed in `files` and exposed as `exports`
 subpaths (for example `@agentregistrar/discovery/agent-signup.schema.json`). The package is
-**source-first**: installable with `npm install @agentregistrar/discovery`, and the npm tarball ships
-the TypeScript sources (no build step). Consumers therefore need a toolchain that transpiles
-dependencies (for example Next.js `transpilePackages` or `tsx`), or they can use the pinned git
-dependency (`github:agentregistrar/spec#v1.2.0`). The package declares no `bin` entry — run the CLI
-with `pnpm validate:discovery`.
+**source-first**: the npm tarball ships the TypeScript sources (no build step). Consumers therefore
+need a toolchain that transpiles dependencies (for example Next.js `transpilePackages` or `tsx`).
+Install it from npm only after the `v1.2.0` tag is published — until then `npm dist-tags.latest` is
+`1.1.0` — or use the pinned git dependency (`github:agentregistrar/spec#v1.2.0`) once the tag exists.
+The package declares no `bin` entry — run the CLI with `pnpm validate:discovery`.
 
 ### Releasing the package
 
@@ -108,7 +110,10 @@ generated automatically. Never run a local `npm publish` and never use an npm to
 
 ## Specification release
 
-`agent-identity-v1` **`v1.2.0`** was released on **2026-10-24** — the two-sided-trust release. It
+`agent-identity-v1` **`v1.2.0`** is the two-sided-trust release, targeted for **2026-10-24**. This
+branch is the reviewed artifact, not the publication: the tag, npm publication, and GitHub release
+follow the merge (see the [release notes](./release-notes-v1.2.0.md) §6). Until the `v1.2.0` tag
+exists, `latest` on npm remains `1.1.0`. The release
 adds the broker-issued RP attestation (Contract G), the provider registration/status API (Contract H),
 broker metadata and signed attestation status (Contract I), the optional `rp_attestation` discovery
 field (D.1), authenticated abuse reporting (D.2), RP-signed receipts (E), authenticated receipt

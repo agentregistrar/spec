@@ -2,10 +2,11 @@
 
 - **Source:** `src/validate-discovery.ts` — run with `pnpm validate:discovery`.
 - **Package:** `@agentregistrar/discovery` `1.2.0`, licensed **Apache-2.0**. It is self-contained and
-  source-first: `pnpm install` from a clean clone, then run the CLI. It is published to npm
-  (`latest` `1.2.0`): install it with `npm install @agentregistrar/discovery`, or consume it from this
-  repository or through a pinned git dependency (`github:agentregistrar/spec#v1.2.0`). There is no
-  `bin` entry — invoke it with `pnpm validate:discovery`.
+  source-first: `pnpm install` from a clean clone, then run the CLI. The `v1.2.0` tag publishes it to
+  npm; until that tag exists, `npm dist-tags.latest` is `1.1.0`, so `npm install
+  @agentregistrar/discovery` still resolves `1.1.0`. Run it from this repository, or after the tag
+  exists use the pinned git dependency (`github:agentregistrar/spec#v1.2.0`). There is no `bin`
+  entry — invoke it with `pnpm validate:discovery`.
 - **Normative references:** [`agent-identity-v1.md`](./agent-identity-v1.md),
   [`scope-boundaries.md`](./scope-boundaries.md).
 - **Related harnesses:** `pnpm validate:fixtures` (standalone JWS/schema matrix) and
@@ -30,7 +31,8 @@ Given a discovery URL or a local JSON file, the validator:
 
 1. Fetches (URL mode) or reads (file mode) the document with a timeout, a bounded read (1 MiB cap),
    and a same-origin redirect limit of three hops; in URL mode it also requires HTTPS, `200 OK`, and
-   `Content-Type: application/json` (and reports cache/CORS headers).
+   `Content-Type: application/json` (and reports cache/CORS headers). **A body that is not valid JSON
+   is a conformance error (exit `1`), not a fetch failure.**
 2. Validates the body against `AgentSignupDiscoverySchema` and against
    `agent-signup.schema.json`. Zod + the written specification win; any divergence between the two
    schemas is reported, never hidden.
@@ -39,10 +41,13 @@ Given a discovery URL or a local JSON file, the validator:
    `extensions`** — and warns (without failing) on unknown top-level fields and non-reverse-DNS
    `extensions` keys.
 5. Checks the `rp_attestation` **field format** only: a non-string, over 16384 characters, or not
-   three unpadded base64url segments is a conformance failure regardless of flags.
+   three unpadded base64url segments is a conformance failure regardless of flags. There is no JWS to
+   verify in that case, so `attestation.status` is `not_checked` (reason `field_malformed`), never
+   `invalid`.
 6. With `--verify-attestation`, verifies the attestation: JWS parse, `typ`, `alg`, `kid`, claims,
-   trusted issuer **before** any JWKS fetch, signature by the selected key, 60-second skew,
-   `rp.origin` against the fetched document origin, and `rp.audience` against `audience`.
+   trusted issuer **before** any JWKS/metadata fetch, signature by the selected key, 60-second skew,
+   `rp.origin` against the fetched document origin, and `rp.audience` against `audience`. An absent
+   optional field is `unverified` plus a warning and leaves the exit code unchanged.
 
 ## 2. File mode
 
@@ -105,6 +110,10 @@ pnpm validate:discovery fixtures/valid-attested-domain.json \
 - `--trusted-rp-broker <issuer>` is repeatable. If any flag is present, the environment fallback
   `AGENT_IDENTITY_TRUSTED_RP_BROKERS` (comma-separated) is ignored. An empty effective list trusts
   nothing: an attestation from any issuer is `attested_untrusted_broker`.
+- Without `--jwks`, a trusted issuer's broker metadata is consulted first: a validated, same-origin
+  `jwks_uri` from `<issuer>/.well-known/agent-broker.json` is used (metadata cached at most 1 hour);
+  otherwise the verifier falls back to `<issuer>/.well-known/jwks.json`. An invalid or cross-origin
+  `jwks_uri` is never followed. `--jwks` pins the source and skips the metadata lookup entirely.
 
 **The trust list is configuration, never inference.** The validator never derives trust from the
 document it is checking, from `issuer_allowlist`, or from the attestation itself. A conformance run
@@ -129,7 +138,7 @@ Exit status is the contract; the JSON is evidence. The v1.2.0 additions:
   "validatorVersion": "1.2.0",
   "valid": true,
   "exitCode": 0,
-  "conformance": { "valid": true, "errors": [], "warnings": [] },
+  "conformance": { "valid": true, "evaluated": true, "errors": [], "warnings": [] },
   "attestation": {
     "present": true, "checked": true, "required": true, "verified": true,
     "status": "verified", "reason": null,
@@ -145,18 +154,23 @@ Exit status is the contract; the JSON is evidence. The v1.2.0 additions:
 
 `valid` remains the **run result** (`valid === (exitCode === 0)`), so existing consumers do not break.
 `conformance.valid` is the document-only verdict, so a consumer can print “conformant, unverified”.
-`attestation` is always an object, never `null`.
+`conformance.evaluated` is `false` and `conformance.valid` is `null` only when the run never obtained a
+document (exit `2`); a fetch failure is not a conformance verdict. `attestation` is always an object,
+never `null`.
 
 `attestation.status` is one of `verified`, `unverified`, `attested_untrusted_broker`, `invalid`,
-`expired`, `unavailable`, or `not_checked` (an attestation is present but `--verify-attestation` was
-not requested). The validator never emits `suspended`; that status comes from the broker or the status
-endpoint.
+`expired`, `unavailable`, or `not_checked` (no verification was performed: `--verify-attestation` was
+not requested, or the field itself is malformed and failed conformance). The validator never emits
+`suspended`; that status comes from the broker or the status endpoint. A malformed `rp_attestation`
+field is **conformance-only**: exit `1`, `attestation.status` `not_checked`, reason `field_malformed`.
+`invalid` is reserved for a structurally valid JWS whose header, claims, or signature fail.
 
 Stable attestation check ids: `attestation.field.present`, `.field.format`, `.jws.parse`, `.typ`,
 `.alg`, `.kid`, `.claims`, `.window`, `.origin`, `.audience`, `.issuer_trusted`, `.jwks`, `.signature`.
 
-Human output adds `ATTESTATION: <status>`, `DOCUMENT: VALID|INVALID`, and `RESULT:
-OK|FAILED|COULD NOT FETCH`.
+Human output adds `ATTESTATION: <status>`, prints attestation warnings as `[WARN] attestation.warning …`,
+`DOCUMENT: VALID|INVALID|NOT CHECKED`, and `RESULT: OK|FAILED|COULD NOT FETCH`. `DOCUMENT: NOT CHECKED`
+is printed on exit `2` (with `n/a`) because there is no document to judge.
 
 ## 6. Exit codes
 
@@ -164,7 +178,7 @@ OK|FAILED|COULD NOT FETCH`.
 | :--- | :--- |
 | `0` | Document fetched, parsed, and conformant; no required check failed. `unverified` / `expired` / `invalid` without `--require-attestation` stays `0`. |
 | `1` | Document parsed and a required check failed: a conformance error (including malformed JSON or a malformed `rp_attestation` field), or an attestation failure under `--require-attestation`. |
-| `2` | The run could not obtain what it needed: document fetch failure, or JWKS unavailable under `--require-attestation`. Never a conformance verdict. |
+| `2` | The run could not obtain what it needed: document read/fetch failure (missing file, network, status, size), or JWKS unavailable under `--require-attestation`. Never a conformance verdict: `conformance.valid` is `null`, `conformance.evaluated` is `false`, and human output prints `DOCUMENT: NOT CHECKED`. |
 
 Status-to-exit mapping (when the document is otherwise conformant):
 
@@ -172,15 +186,17 @@ Status-to-exit mapping (when the document is otherwise conformant):
 | :--- | :--- | :--- | :--- |
 | absent (`unverified`) | `0` | `0` + warning | `1` (`rp_unverified` equivalent) |
 | `verified` | `0` | `0` | `0` |
-| `not_checked` (present, not verified) | `0` | n/a | n/a |
+| `not_checked` (no verification performed: flag absent, or the field is malformed) | `0` | `0` | n/a |
 | `expired` | `0` | `0` + warning | `1` |
 | `invalid` / `attested_untrusted_broker` | `0` | `0` + warning | `1` |
 | `unavailable` | `0` | `0` + warning | `2` |
 
-A malformed `rp_attestation` field is a conformance failure (`1`) regardless of flags. The distinction
-is “no document / no evidence” (`2`, operational) versus “bad document or failed gate” (`1`,
-conformance/verification). Both are non-zero, so any gate that only checks exit status still fails
-correctly.
+A malformed `rp_attestation` field is a conformance failure (`1`) regardless of flags; the
+`attestation` object reports `not_checked` with reason `field_malformed` because there is no JWS to
+verify. `invalid` means a structurally valid JWS failed a named verification check. The exit-code
+distinction is “no document / no evidence” (`2`, operational, `DOCUMENT: NOT CHECKED`) versus “bad
+document or failed gate” (`1`, conformance/verification). Both are non-zero, so any gate that only
+checks exit status still fails correctly.
 
 ## 7. Flags added in v1.2.0
 
@@ -240,6 +256,9 @@ warnings only, so producers can evolve additively without silently losing visibi
   anything under `extensions` — are **never** followed by default.
 - An untrusted attestation `iss` is rejected **before** any network call, so a document cannot steer
   the verifier at a third-party host.
+- For a trusted issuer without `--jwks`, broker metadata is fetched from that issuer's
+  `/.well-known/agent-broker.json`; only a validated, same-origin HTTPS `jwks_uri` is followed,
+  otherwise the fixed `/.well-known/jwks.json` fallback is used.
 - `terms.text` and all document content are treated as data and are never executed or interpreted.
 - Every fetch applies the timeout, the 1 MiB read cap, and the three-hop same-origin redirect limit.
 - JWKS are cached per `iss` and never merged; `--jwks` applies to one issuer.
@@ -274,7 +293,7 @@ unparseable. `--json` emits `{valid, exitCode, errors, warnings}`.
 | `source` | string | The path or URL that was validated. |
 | `valid` | boolean | `true` iff `exitCode === 0` (the run result). |
 | `exitCode` | number | `0`, `1`, or `2` (see §6). |
-| `conformance` | object | `{ valid, errors, warnings }` — the document-only verdict. |
+| `conformance` | object | `{ valid, evaluated, errors, warnings }` — the document-only verdict. `valid` is `true`/`false`, or `null` when the document was never obtained; `evaluated` is `false` only on exit `2`. |
 | `attestation` | object | `{ present, checked, required, verified, status, reason, iss, jti, origin, audience, level, checked_at, jwks_source, checks, errors, warnings }`. Always an object. |
 | `protocol` | string \| null | `protocol` from the document, if present. |
 | `audience` | string \| null | `audience` from the document, if present. |
@@ -285,7 +304,7 @@ unparseable. `--json` emits `{valid, exitCode, errors, warnings}`.
 | `counts` | object | `{ passed, failed, warnings, probes }` — stable keys. |
 | `checks` | array | One entry per document check: `{ id, title, status, message, expected?, actual?, path? }`. |
 | `probes` | array | `{ id, kind, target, status, message }`; `kind` is `jwks` or `endpoint`. |
-| `errors` | array of strings | Failing document checks and probes, each `"<id>: <message>"`. |
+| `errors` | array of strings | Failing document checks and probes, each `"<id>: <message>"`; on exit `2` this holds the operational `source` failure. |
 | `warnings` | array of strings | Document warnings plus attestation warnings/errors, each `"<id>: <message>"`. |
 
 The registry records `source` as `discovery_url` and reads `audience` and `protocol` directly;

@@ -70,6 +70,19 @@ export function isCanonicalOrigin(value: unknown): boolean {
   return value === url.origin;
 }
 
+/**
+ * Canonical HTTPS origin for a **signed identity artifact** (`iss`, `rp.origin`,
+ * broker metadata `issuer`). The localhost development exception does not apply
+ * here: an attestation or metadata document is a public identity statement, and
+ * the published JSON Schemas restrict these origins to `https://`.
+ */
+export function isHttpsCanonicalOrigin(value: unknown): boolean {
+  if (!isCanonicalOrigin(value)) {
+    return false;
+  }
+  return (value as string).startsWith("https://");
+}
+
 /** Backwards-compatible alias used by the discovery checks (trailing slash tolerated). */
 export function isAbsoluteOrigin(value: unknown): boolean {
   if (typeof value !== "string" || value.length === 0 || value.includes("*")) {

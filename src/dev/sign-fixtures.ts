@@ -99,6 +99,7 @@ const ATTESTATION_JTI = {
   unknownKid: attestationJti("unknown-kid"),
   duplicateKid: attestationJti("duplicate-kid"),
   missingExp: attestationJti("missing-exp"),
+  wrongPurposes: attestationJti("wrong-purposes"),
 } as const;
 
 const RECEIPT_JTI = {
@@ -142,14 +143,14 @@ function attestationHeader(seed: SeedEntry, typ = "agent-rp-attestation+jwt"): J
   return { alg: "EdDSA", typ, kid: seed.kid };
 }
 
-function rpKey(seed: SeedEntry): Json {
+function rpKey(seed: SeedEntry, purposes: string[] = ["receipt", "abuse"]): Json {
   return {
     kid: seed.kid,
     kty: "OKP",
     crv: "Ed25519",
     x: seed.x,
     alg: "EdDSA",
-    purposes: ["receipt", "abuse"],
+    purposes,
   };
 }
 
@@ -281,6 +282,7 @@ function statusClaims(options: {
   status: string;
   iat?: number;
   changedAt?: string;
+  extra?: Json;
 }): Json {
   const iat = options.iat ?? FIXTURE_IAT;
   return {
@@ -292,6 +294,7 @@ function statusClaims(options: {
     exp: iat + 300,
     status: options.status,
     status_changed_at: options.changedAt ?? "2026-10-23T00:00:00.000Z",
+    ...(options.extra ?? {}),
   };
 }
 
@@ -411,6 +414,12 @@ async function main(): Promise<void> {
     delete claims.exp;
     return claims;
   })();
+  // Wrong purposes order: valid types, rejected by the `const` JSON Schema and
+  // by the strict Zod tuple. Proves the schema does not accept a reordered set.
+  const wrongPurposesClaims = attestationClaims({
+    jti: ATTESTATION_JTI.wrongPurposes,
+    keys: [rpKey(rp1, ["abuse", "receipt"])],
+  });
 
   const attestationFiles: [string, string][] = [
     ["valid-domain.jwt", signJws(attestationHeader(broker1), domainClaims, broker1)],
@@ -441,6 +450,7 @@ async function main(): Promise<void> {
     ],
     ["duplicate-kid.jwt", signJws(attestationHeader(broker1), duplicateKidClaims, broker1)],
     ["missing-exp.jwt", signJws(attestationHeader(broker1), missingExpClaims, broker1)],
+    ["wrong-purposes.jwt", signJws(attestationHeader(broker1), wrongPurposesClaims, broker1)],
   ];
   for (const [name, jws] of attestationFiles) {
     await writeText(join(attestations, name), jws);
@@ -551,6 +561,19 @@ async function main(): Promise<void> {
       ),
     ],
     [
+      "unknown-additive-claim.jwt",
+      signJws(
+        statusHeader(broker1),
+        statusClaims({
+          jti: uuid("status:additive"),
+          sub: ATTESTATION_JTI.domain,
+          status: "active",
+          extra: { future_status_hint: { schema_revision: 3 } },
+        }),
+        broker1,
+      ),
+    ],
+    [
       "status-suspended.jwt",
       signJws(
         statusHeader(broker1),
@@ -630,6 +653,8 @@ async function main(): Promise<void> {
 
   // Refresh the discovery `rp_attestation` field from the standalone fixture so
   // the two can never drift. Only documents that declare a source are touched.
+  // A deliberately unparseable discovery fixture (the malformed-JSON conformance
+  // row) is skipped: it is not a document and is never signed.
   const topLevel = await readdir(FIXTURES);
   let refreshed = 0;
   for (const name of topLevel) {
@@ -637,7 +662,12 @@ async function main(): Promise<void> {
       continue;
     }
     const path = join(FIXTURES, name);
-    const document = JSON.parse(await readFile(path, "utf8")) as Json;
+    let document: Json;
+    try {
+      document = JSON.parse(await readFile(path, "utf8")) as Json;
+    } catch {
+      continue;
+    }
     const source = document.__fixture_attestation_source;
     if (typeof source !== "string") {
       continue;

@@ -158,13 +158,8 @@
           "const": "EdDSA"
         },
         "purposes": {
-          "description": "Exactly [\"receipt\",\"abuse\"] in v1.2. The array is retained so a future split is additive; a v1.2 producer MUST NOT emit a subset.",
-          "type": "array",
-          "minItems": 2,
-          "maxItems": 2,
-          "items": {
-            "enum": ["receipt", "abuse"]
-          }
+          "description": "Exactly [\"receipt\",\"abuse\"] in v1.2, in that order. The array is retained so a future split is additive; a v1.2 producer MUST NOT emit a subset or reorder it.",
+          "const": ["receipt", "abuse"]
         }
       }
     }

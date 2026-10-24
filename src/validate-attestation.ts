@@ -32,10 +32,15 @@ import {
   ED25519_PUBLIC_KEY_PATTERN,
   KEY_ID_PATTERN,
   MAX_JWKS_CACHE_AGE_MS,
+  MAX_METADATA_CACHE_AGE_MS,
   PROTOCOL_AUDIENCE,
 } from "./constants";
 import { fetchResource, isRecord, normalizeOrigin } from "./http";
-import { parseRpAttestationVerifier, type RpAttestationClaims } from "./schema";
+import {
+  BrokerMetadataSchema,
+  parseRpAttestationVerifier,
+  type RpAttestationClaims,
+} from "./schema";
 
 /** Statuses the validator itself can emit. `suspended` comes from the broker. */
 export type AttestationVerificationStatus =
@@ -226,7 +231,7 @@ const jwksCache = new Map<string, CachedJwks>();
 const JWKS_CACHE_MAX_ENTRIES = 8;
 
 export type JwksLoadResult =
-  | { ok: true; keys: unknown[]; source: string }
+  | { ok: true; keys: unknown[]; source: string; notes: string[] }
   | { ok: false; source: string; message: string };
 
 function isHttpUrl(value: string): boolean {
@@ -266,7 +271,7 @@ async function loadJwksSource(
     if (!keys.ok) {
       return { ok: false, source, message: keys.message };
     }
-    return { ok: true, keys: keys.keys, source };
+    return { ok: true, keys: keys.keys, source, notes: [] };
   }
   let text: string;
   try {
@@ -282,7 +287,81 @@ async function loadJwksSource(
   if (!keys.ok) {
     return { ok: false, source, message: keys.message };
   }
-  return { ok: true, keys: keys.keys, source };
+  return { ok: true, keys: keys.keys, source, notes: [] };
+}
+
+interface CachedMetadata {
+  jwksUri: string | null;
+  fetchedAt: number;
+}
+
+const metadataCache = new Map<string, CachedMetadata>();
+const METADATA_CACHE_MAX_ENTRIES = 8;
+
+function cacheMetadata(issuer: string, entry: CachedMetadata): void {
+  if (metadataCache.size >= METADATA_CACHE_MAX_ENTRIES) {
+    const oldest = metadataCache.keys().next();
+    if (!oldest.done) {
+      metadataCache.delete(oldest.value);
+    }
+  }
+  metadataCache.set(issuer, entry);
+}
+
+/**
+ * Resolves the JWKS source for a trusted issuer (spec §5.4, §16.1):
+ *
+ * 1. the broker metadata `jwks_uri`, but only when the metadata is fetched from
+ *    the requested issuer, validates against `BrokerMetadataSchema`, declares
+ *    that same `issuer`, and its `jwks_uri` is HTTPS and same-origin with it;
+ * 2. otherwise `<issuer>/.well-known/jwks.json`.
+ *
+ * The metadata lookup happens only **after** the trusted-issuer check, is
+ * bounded like every other fetch, and is cached for at most one hour. A
+ * cross-origin or invalid `jwks_uri` is never followed.
+ */
+async function resolveJwksSource(
+  issuer: string,
+  options: AttestationVerificationOptions,
+  notes: string[],
+): Promise<string> {
+  const base = normalizeOrigin(issuer);
+  const fallback = `${base}/.well-known/jwks.json`;
+  const now = Date.now();
+  const cached = metadataCache.get(base);
+  if (cached !== undefined && now - cached.fetchedAt <= MAX_METADATA_CACHE_AGE_MS) {
+    return cached.jwksUri ?? fallback;
+  }
+
+  const metadataUrl = `${base}/.well-known/agent-broker.json`;
+  const outcome = await fetchResource(metadataUrl, {
+    timeoutMs: options.timeoutMs,
+    maxBytes: options.maxBytes,
+    requireJson: true,
+  });
+  let resolved: string | null = null;
+  if (outcome.ok) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(outcome.text);
+    } catch {
+      notes.push(`broker metadata at ${metadataUrl} is not valid JSON; using ${fallback}`);
+    }
+    if (parsed !== undefined) {
+      const metadata = BrokerMetadataSchema.safeParse(parsed);
+      if (!metadata.success) {
+        notes.push(`broker metadata at ${metadataUrl} is invalid; using ${fallback}`);
+      } else if (metadata.data.issuer !== base) {
+        notes.push(
+          `broker metadata issuer ${metadata.data.issuer} does not equal ${base}; using ${fallback}`,
+        );
+      } else {
+        resolved = metadata.data.jwks_uri;
+      }
+    }
+  }
+  cacheMetadata(base, { jwksUri: resolved, fetchedAt: now });
+  return resolved ?? fallback;
 }
 
 /**
@@ -290,8 +369,9 @@ async function loadJwksSource(
  *
  * - `--jwks <path-or-url>` pins that source for this run and is never cached or
  *   merged with another issuer;
- * - otherwise `<issuer>/.well-known/jwks.json` is fetched and cached per `iss`
- *   for at most one hour.
+ * - otherwise the issuer's broker metadata `jwks_uri` is preferred when it is
+ *   valid and same-origin, else `<issuer>/.well-known/jwks.json` is fetched.
+ * Both the metadata and the JWKS are cached per `iss` for at most one hour.
  */
 export async function loadIssuerJwks(
   issuer: string,
@@ -300,11 +380,12 @@ export async function loadIssuerJwks(
   if (options.jwks !== null) {
     return loadJwksSource(options.jwks, options);
   }
-  const source = `${normalizeOrigin(issuer)}/.well-known/jwks.json`;
+  const notes: string[] = [];
+  const source = await resolveJwksSource(issuer, options, notes);
   const now = Date.now();
   const cached = jwksCache.get(issuer);
   if (cached !== undefined && now - cached.fetchedAt <= MAX_JWKS_CACHE_AGE_MS) {
-    return { ok: true, keys: cached.keys, source };
+    return { ok: true, keys: cached.keys, source, notes };
   }
   const loaded = await loadJwksSource(source, options);
   if (!loaded.ok) {
@@ -317,7 +398,7 @@ export async function loadIssuerJwks(
     }
   }
   jwksCache.set(issuer, { keys: loaded.keys, fetchedAt: now });
-  return loaded;
+  return { ok: true, keys: loaded.keys, source: loaded.source, notes };
 }
 
 // ---------------------------------------------------------------------------
@@ -410,9 +491,11 @@ export async function verifyRpAttestation(
 
   if (attestation === undefined || attestation === null) {
     push(result, "field.present", "skip", "no rp_attestation field (optional; document is unverified)");
-    if (options.required) {
+    // An absent optional field is never a failure, but a run that explicitly
+    // asked for verification must say out loud that there was nothing to verify.
+    if (options.check) {
       result.warnings.push(
-        "rp_attestation is absent but --require-attestation was requested",
+        "rp_attestation is absent; the document is unverified (no attestation to verify; exit unchanged)",
       );
     }
     return result;
@@ -420,14 +503,18 @@ export async function verifyRpAttestation(
 
   result.present = true;
 
+  // A malformed field is a **conformance** error, not a verification verdict
+  // (spec §5.3/§19.1): there is no JWS to verify. The document check fails the
+  // run with exit 1; the attestation result reports `not_checked` rather than
+  // mislabelling a non-token as `invalid`.
   if (typeof attestation !== "string") {
-    result.checked = true;
     push(result, "field.present", "pass", "rp_attestation is present");
     push(result, "field.format", "fail", "rp_attestation must be a string");
-    return failWith(result, "invalid", "field_malformed", "rp_attestation must be a compact JWS string");
+    result.status = "not_checked";
+    result.reason = "field_malformed";
+    return result;
   }
   if (attestation.length > 16_384 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(attestation)) {
-    result.checked = true;
     push(result, "field.present", "pass", "rp_attestation is present");
     push(
       result,
@@ -435,12 +522,9 @@ export async function verifyRpAttestation(
       "fail",
       "rp_attestation must be three unpadded base64url segments separated by `.` and at most 16384 characters",
     );
-    return failWith(
-      result,
-      "invalid",
-      "field_malformed",
-      "rp_attestation is not a compact JWS string",
-    );
+    result.status = "not_checked";
+    result.reason = "field_malformed";
+    return result;
   }
 
   push(result, "field.present", "pass", "rp_attestation is present");
@@ -529,6 +613,9 @@ export async function verifyRpAttestation(
 
   const jwks = await loadIssuerJwks(claims.iss, options);
   result.jwks_source = jwks.source;
+  if (jwks.ok) {
+    result.warnings.push(...jwks.notes);
+  }
   if (!jwks.ok) {
     push(result, "jwks", "fail", `could not load JWKS: ${jwks.message}`);
     result.status = "unavailable";

@@ -48,7 +48,7 @@ configuration, signs nothing outside `fixtures/`, and MUST NOT be used for a rea
 
 ### Fixture-only discovery fields
 
-Two fixture-only top-level fields are used and are warning-level unknown fields to the validator:
+Three fixture-only top-level fields are used and are warning-level unknown fields to the validator:
 
 - `__fixture_note` — a human note explaining the expected result. Never protocol surface.
 - `__fixture_origin` — the origin the validator should treat as the **fetch origin** in file mode, so
@@ -82,9 +82,11 @@ for a rule JSON Schema cannot express (currently: unique `keys[].kid`).
 | `valid-minimal.json`, `valid-full.json`, `valid-localhost.json` | conformant, attestation `unverified`, exit `0` |
 | `valid-attested-domain.json` | `verified`, level `domain`, exit `0` (offline, trusted broker, `--at 2026-10-24T00:00:00Z`) |
 | `valid-attested-entity.json` | `verified`, level `entity`, `legal_name` present |
-| `invalid-attestation-malformed.json` (two segments) | conformance failure, exit `1`, no network |
-| `invalid-attestation-oversize.json` (>16384 chars) | conformance failure, exit `1`, no network |
-| `invalid-attestation-not-string.json` | conformance failure, exit `1`, no network |
+| `invalid-attestation-malformed.json` (two segments) | conformance failure, exit `1`, no network; `attestation.status` is `not_checked` (`field_malformed`), not `invalid` |
+| `invalid-attestation-oversize.json` (>16384 chars) | conformance failure, exit `1`, no network, `not_checked` |
+| `invalid-attestation-not-string.json` | conformance failure, exit `1`, no network, `not_checked` |
+| `invalid-json-body.json` (deliberately truncated JSON) | conformance failure, exit `1`, `conformance.evaluated: true`, no `fetchFailure` |
+| `does-not-exist.json` (path only, no file) | operational failure, exit `2`, `conformance.valid: null`, `evaluated: false`, error under `fetchFailure` |
 | `valid-attestation-expired.json` | `expired` warning, exit `0`; exit `1` with `--require-attestation` (at 2026-11-30) |
 | `valid-attested-unavailable.json` | `unavailable`, exit `0`; exit `2` with `--require-attestation` |
 | Untrusted broker (`valid-attested-domain.json` with no trusted flag) | `attested_untrusted_broker`, exit `0`; exit `1` with `--require-attestation` |
@@ -106,6 +108,7 @@ for a rule JSON Schema cannot express (currently: unique `keys[].kid`).
 | `unknown-kid.jwt` | `invalid` / `unknown_kid` | valid | valid |
 | `duplicate-kid.jwt` | `invalid` / `claims_invalid` | JSON Schema valid; Zod fails (cross-field unique `kid`) | fails |
 | `missing-exp.jwt` | `invalid` / `claims_invalid` | fails (missing `exp`) | fails |
+| `wrong-purposes.jwt` | `invalid` / `claims_invalid` | fails (`purposes` is `const ["receipt","abuse"]`; a reordered or duplicated set is not the frozen tuple) | fails |
 
 ### Contract E receipts (`receipts/`)
 
@@ -135,13 +138,16 @@ binding, and the historical window.
 ### Contract I status (`status/`)
 
 All status fixtures have `exp - iat = 300` and `status_changed_at <= iat`, and are signed by broker 1
-except the bad-signature case.
+except the bad-signature case. The status JWS has the same producer/verifier split as the attestation:
+producer mode is the closed JSON Schema plus strict Zod; verifier mode validates known claims and
+ignores additive ones.
 
 | Fixture | Expected |
 | :--- | :--- |
 | `status-active.jwt` | passes; `status: "active"` |
 | `status-suspended.jwt` | passes; `status: "suspended"` |
 | `status-revoked.jwt` | passes; `status: "revoked"` |
+| `unknown-additive-claim.jwt` | rules pass; producer schema fails (unknown claim), verifier mode passes |
 | `status-wrong-sub.jwt` | fails `wrong_sub` |
 | `status-bad-signature.jwt` | fails `bad_signature` |
 

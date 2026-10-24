@@ -166,7 +166,7 @@
       }
     },
     "context": {
-      "description": "Optional post-signup context guide pointer (spec §11). Not part of the attestation.",
+      "description": "Optional post-signup context guide pointer (spec §11.3). When `context` is present, `url` and `sha256` are BOTH REQUIRED: a URL without a hash cannot be pinned, and a hash without a URL cannot be fetched (`sha256` is required whenever `url` is present). Not part of the attestation.",
       "type": "object",
       "additionalProperties": false,
       "required": ["url", "sha256"],

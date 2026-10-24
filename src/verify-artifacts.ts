@@ -18,7 +18,7 @@ import {
   RECEIPT_TYP,
 } from "./constants";
 import { isRecord } from "./http";
-import { AttestationStatusClaimsSchema } from "./schema";
+import { AttestationStatusClaimsVerifierSchema } from "./schema";
 import {
   loadIssuerJwks,
   parseCompactJws,
@@ -293,12 +293,15 @@ export async function verifyStatusFixture(
   if (headerFailure !== null) {
     return { ...headerFailure, claims: null };
   }
-  const claimsResult = AttestationStatusClaimsSchema.safeParse(parsed.jws.claims);
+  // Verifier mode: validate every known claim, ignore additive ones.
+  const claimsResult = AttestationStatusClaimsVerifierSchema.safeParse(parsed.jws.claims);
   if (!claimsResult.success) {
     return {
       valid: false,
       rule: "claims",
-      message: claimsResult.error.issues.map((issue) => issue.message).join("; "),
+      message: claimsResult.error.issues
+        .map((issue: { message: string }) => issue.message)
+        .join("; "),
       claims: parsed.jws.claims,
     };
   }

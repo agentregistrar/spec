@@ -31,7 +31,7 @@ import {
 } from "./json-schema";
 import {
   BrokerMetadataSchema,
-  AttestationStatusClaimsSchema,
+  AttestationStatusClaimsVerifierSchema,
   RpAttestationClaimsSchema,
   RpAttestationClaimsVerifierSchema,
 } from "./schema";
@@ -190,7 +190,17 @@ async function runDiscoveryCase(
   compare(fixture.expect.status, result.attestation.status, "attestation.status", problems);
   compare(fixture.expect.level, result.attestation.level, "attestation.level", problems);
   compare(fixture.expect.conformance, result.conformance.valid, "conformance.valid", problems);
+  compare(fixture.expect.evaluated, result.conformance.evaluated, "conformance.evaluated", problems);
   compare(fixture.expect.verified, result.attestation.verified, "attestation.verified", problems);
+  const warningNeedle = fixture.expect.warningsInclude;
+  if (typeof warningNeedle === "string") {
+    const found = result.attestation.warnings.some((warning) => warning.includes(warningNeedle));
+    if (!found) {
+      problems.push(
+        `attestation.warnings: expected an entry containing ${JSON.stringify(warningNeedle)}, got ${JSON.stringify(result.attestation.warnings)}`,
+      );
+    }
+  }
   return {
     id: fixture.id,
     passed: problems.length === 0,
@@ -342,13 +352,17 @@ async function runStatusCase(
     claims,
     "attestation-status.schema.json",
     fixture.expect.schema === true,
-    fixture.expect.schema === true,
+    fixture.expect.verifier === true,
     problems,
   );
-  const zod = AttestationStatusClaimsSchema.safeParse(claims).success;
-  const json = checkAgainstRootSchema(claims, "attestation-status.schema.json").ok;
-  if (zod !== json) {
-    problems.push(`status schema divergence: JSON Schema valid=${json}, Zod valid=${zod}`);
+  // The status JWS has the same producer/verifier split as the attestation:
+  // producer mode is the closed JSON Schema + strict Zod; verifier mode ignores
+  // additive claims. The verifier gate used below is the tolerant parser.
+  const verifierZod = AttestationStatusClaimsVerifierSchema.safeParse(claims).success;
+  if (verifierZod !== (fixture.expect.verifier === true)) {
+    problems.push(
+      `status verifier mode (Zod): expected valid=${fixture.expect.verifier === true}, got ${verifierZod}`,
+    );
   }
   const expectedSub =
     fixture.expectedSubFrom !== undefined

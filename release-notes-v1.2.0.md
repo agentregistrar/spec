@@ -2,7 +2,7 @@
 
 - **Protocol identifier:** `agent-identity-v1` (unchanged)
 - **Specification version:** `v1.2.0`
-- **Release date:** 2026-10-24
+- **Release date:** 2026-10-24 (target; this branch is the reviewed artifact — see §6)
 - **Normative specification:** [`agent-identity-v1.md`](./agent-identity-v1.md)
 - **Change process:** [`release-notes-v1.0.0.md`](./release-notes-v1.0.0.md) §3
 - **Previous release:** [`release-notes-v1.1.0.md`](./release-notes-v1.1.0.md)
@@ -49,6 +49,9 @@ The wire protocol id stays `agent-identity-v1`. `rp_attestation` is **OPTIONAL**
   `401 {"error":"unauthorized","code":"unauthenticated_report"}`.
 - **Validator:** `valid` is still the run result (`valid === (exitCode === 0)`). The new
   `conformance` and `attestation` objects are additive; `validatorVersion` is now `"1.2.0"`.
+  `conformance.evaluated` distinguishes "not evaluated" (exit `2`, no document) from "invalid";
+  unparseable JSON is a conformance error (exit `1`), and a malformed `rp_attestation` field is
+  conformance-only (`attestation.status: not_checked`), never `invalid`.
 - **Package:** `@agentregistrar/discovery` `1.2.0` exports the new schemas and parsers. No existing
   export was removed or renamed. There is still no `bin` entry.
 - **Dependencies:** no new runtime dependency. JWS/Ed25519 verification uses Node's built-in
@@ -80,7 +83,7 @@ and §11.6, so their existing references keep working.
 | `attestation-status.schema.json` | New (Contract I status JWS claims). |
 | `signup-receipt.schema.json` | New (Contract E v1.2). |
 | `abuse-report.schema.json` | New (Contract D.2). |
-| `src/schema.ts`, `src/index.ts` | Zod for discovery, attestation, metadata, status; producer/verifier parsers. |
+| `src/schema.ts`, `src/index.ts` | Zod for discovery, attestation, metadata, status; producer/verifier parsers for the attestation and the status JWS. |
 | `src/validate-attestation.ts` | Contract G verifier (validator-internal; not exported from `src/index.ts`). |
 | `src/validate-discovery.ts` | Five new flags, conformance/attestation split, exit mapping, output. |
 | `src/validate-fixtures.ts`, `src/dev/sign-fixtures.ts`, `src/verify-artifacts.ts` | Manual fixture harness and deterministic fixture signer. |
@@ -92,7 +95,7 @@ and §11.6, so their existing references keep working.
 
 ## 5. Validation evidence
 
-Run on **2026-10-24** from a clean clone of this repository on Node `v24.21.0` and pnpm `12.9.1`,
+Run on **2026-10-24** from a clean clone of this repository on Node `v24.21.0` and pnpm `9.15.4`,
 with the frozen fixture clock `2026-10-24T00:00:00Z` and arena-only fixture keys. `jq` was not
 installed in the verification environment, so the JSON projections below were produced with a
 one-line Node equivalent of the documented `jq` pipelines; the validator output and exit codes are
@@ -111,27 +114,34 @@ A="--verify-attestation --jwks fixtures/keys/fixture-jwks-broker-1.json --truste
 | Entity level | `$V fixtures/valid-attested-entity.json $A --require-attestation --at 2026-10-24T00:00:00Z --json` | `verified`, level `entity` |
 | Expired (warning) | `$V fixtures/valid-attestation-expired.json $A --at 2026-11-30T00:00:00Z --json` | `valid true`, `exitCode 0`, `expired` |
 | Expired (gate) | same `+ --require-attestation` | exit `1` |
-| Malformed field | `$V fixtures/invalid-attestation-malformed.json --json` | exit `1`, no network |
+| Malformed field | `$V fixtures/invalid-attestation-malformed.json --json` | exit `1`, `conformance.valid false`, `attestation.status "not_checked"`, no network |
+| Unparseable JSON | `$V fixtures/invalid-json-body.json --json` | exit `1`, `conformance.valid false`, `conformance.evaluated true`, `fetchFailure null` |
+| No document | `$V fixtures/does-not-exist.json --json` | exit `2`, `conformance.valid null`, `conformance.evaluated false`, `fetchFailure` set, `DOCUMENT: NOT CHECKED` |
+| Absent attestation warning | `$V fixtures/valid-minimal.json --verify-attestation --json` | exit `0`, `unverified`, warning "rp_attestation is absent" |
+| Wrong purposes tuple | `pnpm --silent validate:fixtures` row `attestations/wrong-purposes` | rejected by both `rp-attestation.schema.json` and strict Zod (`claims_invalid`) |
 | Untrusted broker | `$V fixtures/valid-attested-domain.json --verify-attestation --jwks … --at … --json` (no trust flag) | `attested_untrusted_broker` |
 | Untrusted broker (gate) | same `+ --require-attestation` | exit `1` |
 | Broker unavailable (gate) | `$V fixtures/valid-attested-unavailable.json --require-attestation --trusted-rp-broker https://rp-broker.example --jwks fixtures/keys/missing.json --json` | exit `2` |
 | Broker unavailable (network) | `$V … --require-attestation --trusted-rp-broker https://rp-broker.example --timeout 1` | exit `2`, `unavailable` |
 | Fixture reproducibility | `pnpm sign:fixtures && git diff --exit-code fixtures/` | byte-identical, exit `0` |
-| Fixture matrix | `pnpm --silent validate:fixtures fixtures/expected.json` | `50 passed, 0 failed` |
+| Fixture matrix | `pnpm --silent validate:fixtures fixtures/expected.json` | `56 passed, 0 failed` |
 | Registry valid | `pnpm --silent validate:registry registry/implementations.json --json` | `{"valid":true,"exitCode":0,"errors":[],"warnings":[]}` |
 | Registry violation | deliberate `level:"enhanced"` + `attestation_jti:"rpa_x"` | exit `1`, two schema errors plus a semantic error |
 | Packaging | `npm pack --dry-run --json` | tarball contains all six root schemas, `registry/implementations.schema.json`, and `src/` |
 
 The fixture matrix covers the §5.13 rows: discovery with/without an attestation, malformed and
-oversize fields, expired/invalid/untrusted/unavailable attestations, every listed attestation
-negative, `unknown-additive-claim` (producer mode fails, verifier mode passes), receipts including a
-legacy `exp` and a rotated key, abuse reports, status responses, broker metadata, and provider
-request/response examples.
+oversize fields, unparseable JSON, an absent/missing document, expired/invalid/untrusted/unavailable
+attestations, every listed attestation negative (including a reordered `purposes` tuple),
+`unknown-additive-claim` in both producer and verifier mode, receipts including a legacy `exp` and a
+rotated key, abuse reports, status responses (including an additive status claim), broker metadata,
+and provider request/response examples.
 
 ## 6. Release mechanics
 
 Per the repository `AGENTS.md`, the source-first package is published with **npm trusted publishing
-(OIDC)** — never a local `npm publish` and never an npm token:
+(OIDC)** — never a local `npm publish` and never an npm token. Nothing in this branch claims that the
+tag, npm publication, or GitHub release has already happened; this branch is the reviewed artifact and
+`npm dist-tags.latest` remains `1.1.0` until step 3 completes:
 
 1. merge the release PR to `main`;
 2. tag the merge commit `v1.2.0` and push the tag;

@@ -45,7 +45,7 @@ Required fields (`agent-identity-v1.md` §5.1): `protocol` (`"agent-identity-v1"
 `terms` (complete `text` + `version` + `url` + `sha256`), and `endpoints.agent_signup`.
 
 Optional fields (§5.2): `spec`, `provider_url`, `contact`, `updated_at`, non-capability `extensions`
-keyed by reverse-DNS namespace, and the optional `rp_attestation` compact JWS (§11 of this guide).
+keyed by reverse-DNS namespace, and the optional `rp_attestation` compact JWS (§10 of this guide).
 Nothing else. See the minimal example in §5.5 of the spec; do not copy vendor fields from older docs.
 
 ### Forbidden fields (§5.3)
@@ -126,7 +126,9 @@ identity/attribution proof — keep it identity-only:
   present; never rely on it for access control.
 - Remove vendor resource claims: **no** `service.instance_sku`, **no** `service.endpoint_url`, and no
   free-form resource metadata.
-- Optional `context`: `{ "url": "https://…/docs/SKILL.md", "sha256": "sha256:…" }`.
+- Optional `context`: `{ "url": "https://…/docs/SKILL.md", "sha256": "sha256:…" }`. When `context` is
+  present, both fields are required: a URL without a hash cannot be pinned, and a hash without a URL
+  cannot be fetched.
 
 Sign with the key in your attestation named by `service.attestation_jti`; `service.key_id` must name
 that key, the JWS header `kid` must equal `service.key_id`, and the key must carry the `receipt`
@@ -200,10 +202,11 @@ pnpm validate:discovery https://your-service.example/.well-known/agent-signup.js
 pnpm --silent validate:discovery https://your-service.example/.well-known/agent-signup.json --json | jq .
 ```
 
-Exit codes: `0` valid / no required check failed, `1` conformance or required-verification failure,
-`2` could not obtain what the run needed (document or JWKS). The validator rejects vendor capability
-fields at any depth (including under `extensions`) and recomputes the ToS hash. A validator-passing
-document is the objective entry criterion for the implementation registry.
+Exit codes: `0` valid / no required check failed, `1` conformance or required-verification failure
+(including a body that is not valid JSON), `2` could not obtain what the run needed (document or
+JWKS) — an operational result with no conformance verdict (`DOCUMENT: NOT CHECKED`). The validator
+rejects vendor capability fields at any depth (including under `extensions`) and recomputes the ToS
+hash. A validator-passing document is the objective entry criterion for the implementation registry.
 
 Conformance and attestation verification are separate. Once you publish `rp_attestation`, verify it
 offline in CI against a pinned broker JWKS:
@@ -220,10 +223,10 @@ pnpm --silent validate:discovery https://your-service.example/.well-known/agent-
 conformance verdict still passes; with it, anything but `verified` fails (and `unavailable` exits
 `2`).
 
-The validator is the source-first package `@agentregistrar/discovery` (`1.2.0`, **Apache-2.0**);
-it is published to npm (`latest` `1.2.0`), so you can install it or run it from a
-clone of this specification repository or through a pinned git dependency
-(`github:agentregistrar/spec#v1.2.0`). There is no `bin` entry — always invoke it with
+The validator is the source-first package `@agentregistrar/discovery` (`1.2.0`, **Apache-2.0**).
+The `v1.2.0` tag publishes it to npm; until that tag exists `npm dist-tags.latest` is `1.1.0`, so run
+it from a clone of this specification repository, or after the tag exists use the pinned git
+dependency (`github:agentregistrar/spec#v1.2.0`). There is no `bin` entry — always invoke it with
 `pnpm validate:discovery`.
 
 Optionally, non-destructively probe your assertion issuers/endpoint:
@@ -241,8 +244,9 @@ under `--verify-attestation`.
 
 ## 8. Adoption / registry conventions
 
-The specification is released as **`v1.2.0` (2026-10-24)** — see
-[`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md). Earlier releases: **`v1.1.0`**
+The specification release **`v1.2.0`** is targeted for **2026-10-24** — see
+[`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md). This branch is the reviewed artifact, not the
+publication: the tag and npm release follow the merge. Earlier releases: **`v1.1.0`**
 (2026-10-18, [`release-notes-v1.1.0.md`](./release-notes-v1.1.0.md)) and the initial **`v1.0.0`**
 (2026-10-17, [`release-notes-v1.0.0.md`](./release-notes-v1.0.0.md)). The adoption surface is
 published in
@@ -256,7 +260,7 @@ published in
 - Registry `capabilities` are **protocol** capabilities only (`agent_signup`, `post_signup_context`).
   Vendor features are not registry capabilities; they live in your guide.
 - Record your `discovery_url` and read `audience` / `protocol` from the validator's `--json` output
-  (`validator.md` §9).
+  (`validator.md` §12).
 - To submit an entry, open a pull request against `registry/implementations.json` with your
   validator evidence; see [`registry/README.md`](./registry/README.md) §4. The conformance
   badge snippet and its usage terms are in §5 of the same document.
@@ -305,7 +309,21 @@ as `rp_attestation` in `/.well-known/agent-signup.json`.
 - An expired attestation is `expired`, not `unverified`, and a `require` policy will refuse it. An
   absent field is conformant and `unverified`.
 - If you operate a *broker* as well, serve `/.well-known/agent-broker.json` and the signed status
-  endpoint described in §14.
+  endpoint described in `agent-identity-v1.md` §16.
+
+> **Claim sources (non-normative; Issue 07 mapping).** When a broker assembles the claims, each field
+> is copied from the provider record rather than typed free-form: `rp.origin` from
+> `provider_origins.origin`; `rp.audience` from `provider_origins.audience`; `rp.name` from
+> `provider_origins.provider_name`; `rp.legal_name` from `provider_accounts.legal_name` (required only
+> at `entity`); `rp.contact.email` from `provider_accounts.contact_email`; `rp.contact.name` from
+> `provider_accounts.name`; `rp.verification.origin_verified_at` from
+> `provider_origins.verified_at`; `rp.verification.method` from
+> `provider_origins.verification_method`; `rp.verification.level` is `entity` only when
+> `provider_accounts.entity_reviewed_at` is non-null (operator review) with a legal name present, and
+> `rp.verification.entity_reviewed_at` is that same timestamp (`null` at `domain`).
+> `provider_origins.contact`, when present, is a human-facing security/contact URL and is **not**
+> copied into the attestation. This mapping is explanatory; `agent-identity-v1.md` §14.1 is
+> normative.
 
 Test offline before publishing:
 

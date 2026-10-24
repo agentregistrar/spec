@@ -2,7 +2,7 @@
 
 - **Status:** Published.
 - **Machine-readable registry (canonical source):** [`implementations.json`](./implementations.json)
-- **Specification:** [`../agent-identity-v1.md`](../agent-identity-v1.md) — released as **v1.2.0** on 2026-10-24 ([release notes](../release-notes-v1.2.0.md)); earlier releases are `v1.1.0` (2026-10-18) and `v1.0.0` (2026-10-17).
+- **Specification:** [`../agent-identity-v1.md`](../agent-identity-v1.md) — the **v1.2.0** revision is targeted for 2026-10-24 ([release notes](../release-notes-v1.2.0.md)); this branch is the reviewed artifact and the tag/publication follow the merge. Earlier releases are `v1.1.0` (2026-10-18) and `v1.0.0` (2026-10-17).
 - **Conformance and attestation validator:** `src/validate-discovery.ts` — run as `pnpm validate:discovery <url-or-file> --json` ([validator guide](../validator.md)).
 - **Registry validator and schema:** `src/validate-registry.ts` (`pnpm validate:registry [path] [--json]`) and [`implementations.schema.json`](./implementations.schema.json).
 - **Implementation guide:** [`../implementing-agent-identity-v1.md`](../implementing-agent-identity-v1.md).
@@ -202,7 +202,7 @@ the `<…>` placeholders once hosting exists. In-repo, the link targets are
 | Conformance + attestation validator guide | [`../validator.md`](../validator.md) |
 | Registry schema | [`./implementations.schema.json`](./implementations.schema.json) |
 | Implementation guide (new RPs) | [`../implementing-agent-identity-v1.md`](../implementing-agent-identity-v1.md) |
-| Release notes (`v1.2.0`, current) | [`../release-notes-v1.2.0.md`](../release-notes-v1.2.0.md) |
+| Release notes (`v1.2.0`, this branch) | [`../release-notes-v1.2.0.md`](../release-notes-v1.2.0.md) |
 | Release notes (`v1.1.0`) | [`../release-notes-v1.1.0.md`](../release-notes-v1.1.0.md) |
 | Release notes (`v1.0.0`) | [`../release-notes-v1.0.0.md`](../release-notes-v1.0.0.md) |
 | Machine-readable registry | [`./implementations.json`](./implementations.json) |

@@ -84,6 +84,22 @@
       }
     },
     {
+      "id": "discovery/valid-minimal--verify-absent",
+      "kind": "discovery",
+      "path": "fixtures/valid-minimal.json",
+      "options": {
+        "verifyAttestation": true
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "unverified",
+        "conformance": true,
+        "evaluated": true,
+        "verified": false,
+        "warningsInclude": "rp_attestation is absent"
+      }
+    },
+    {
       "id": "discovery/invalid-attestation-malformed",
       "kind": "discovery",
       "path": "fixtures/invalid-attestation-malformed.json",
@@ -92,8 +108,24 @@
       },
       "expect": {
         "exitCode": 1,
-        "status": "invalid",
+        "status": "not_checked",
         "conformance": false,
+        "evaluated": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/invalid-attestation-malformed--verify",
+      "kind": "discovery",
+      "path": "fixtures/invalid-attestation-malformed.json",
+      "options": {
+        "verifyAttestation": true
+      },
+      "expect": {
+        "exitCode": 1,
+        "status": "not_checked",
+        "conformance": false,
+        "evaluated": true,
         "verified": false
       }
     },
@@ -106,8 +138,9 @@
       },
       "expect": {
         "exitCode": 1,
-        "status": "invalid",
+        "status": "not_checked",
         "conformance": false,
+        "evaluated": true,
         "verified": false
       }
     },
@@ -120,8 +153,39 @@
       },
       "expect": {
         "exitCode": 1,
-        "status": "invalid",
+        "status": "not_checked",
         "conformance": false,
+        "evaluated": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/invalid-json-body",
+      "kind": "discovery",
+      "path": "fixtures/invalid-json-body.json",
+      "options": {
+        "verifyAttestation": false
+      },
+      "expect": {
+        "exitCode": 1,
+        "status": "unverified",
+        "conformance": false,
+        "evaluated": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/missing-file",
+      "kind": "discovery",
+      "path": "fixtures/does-not-exist.json",
+      "options": {
+        "verifyAttestation": false
+      },
+      "expect": {
+        "exitCode": 2,
+        "status": "unverified",
+        "conformance": null,
+        "evaluated": false,
         "verified": false
       }
     },
@@ -387,6 +451,19 @@
       }
     },
     {
+      "id": "attestations/wrong-purposes",
+      "kind": "attestation",
+      "jwt": "fixtures/attestations/wrong-purposes.jwt",
+      "documentOrigin": "https://vaporcloud.example",
+      "options": {},
+      "expect": {
+        "status": "invalid",
+        "producer": false,
+        "verifier": false,
+        "reason": "claims_invalid"
+      }
+    },
+    {
       "id": "receipts/valid-receipt",
       "kind": "receipt",
       "jwt": "fixtures/receipts/valid-receipt.jwt",
@@ -519,7 +596,20 @@
       "expect": {
         "valid": true,
         "rule": null,
-        "schema": true
+        "schema": true,
+        "verifier": true
+      }
+    },
+    {
+      "id": "status/unknown-additive-claim",
+      "kind": "status",
+      "jwt": "fixtures/status/unknown-additive-claim.jwt",
+      "expectedSubFrom": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": true,
+        "rule": null,
+        "schema": false,
+        "verifier": true
       }
     },
     {
@@ -530,7 +620,8 @@
       "expect": {
         "valid": true,
         "rule": null,
-        "schema": true
+        "schema": true,
+        "verifier": true
       }
     },
     {
@@ -541,7 +632,8 @@
       "expect": {
         "valid": true,
         "rule": null,
-        "schema": true
+        "schema": true,
+        "verifier": true
       }
     },
     {
@@ -552,7 +644,8 @@
       "expect": {
         "valid": false,
         "rule": "wrong_sub",
-        "schema": true
+        "schema": true,
+        "verifier": true
       }
     },
     {
@@ -563,7 +656,8 @@
       "expect": {
         "valid": false,
         "rule": "bad_signature",
-        "schema": true
+        "schema": true,
+        "verifier": true
       }
     },
     {

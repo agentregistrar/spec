@@ -59,7 +59,7 @@ account identity keys, and credential handoff & recovery. Release notes, includi
 conformance-validator evidence and the change process, are in
 [`release-notes-v1.1.0.md`](./release-notes-v1.1.0.md). `v1.0.0` implementors remain conformant.
 
-**Release record (`v1.2.0`).** `v1.2.0` was recorded on **2026-10-24**. It adds the Contracts
+**Release record (`v1.2.0`).** `v1.2.0` is the **2026-10-24** revision. It adds the Contracts
 G/H/I text in §14–§19, the optional `rp_attestation` field (§5.2, §5.4), the authenticated abuse
 contract (§11.5) and receipt ingestion contract (§11.6), the v1.2 receipt rules (§11.1, §11.4), and
 renumbers the former §14–§17 to §20–§23. The release ships in the same tag with the JSON Schemas
@@ -68,14 +68,15 @@ renumbers the former §14–§17 to §20–§23. The release ships in the same t
 the fixture matrix in [`fixtures/`](./fixtures) with `fixtures/expected.json`; the validator
 (`validatorVersion` and package version `1.2.0`) with `pnpm validate:discovery`,
 `pnpm validate:fixtures`, and `pnpm validate:registry`; and
-[`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md). Document conformance never requires a live
-RP broker: only `--verify-attestation` contacts one.
+[`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md). This branch is the reviewed artifact, not the
+publication: the tag, npm release, and GitHub release follow the merge (release notes §6). Document
+conformance never requires a live RP broker: only `--verify-attestation` contacts one.
 
 ### 1.3 Version identity
 
 - The protocol version is carried **major-only** in the discovery document's `protocol` field:
   `agent-identity-v1`.
-- This specification is published as `v1.2.0`. Minor/patch revisions are additive and do not change
+- This specification revision is `v1.2.0`. Minor/patch revisions are additive and do not change
   the `protocol` value; breaking changes require a new `protocol` value and a new discovery path (§13).
   Additive v1 changes are recorded in the changelog above and must pass the
   [`scope-boundaries.md`](./scope-boundaries.md) review checklist; the process is written down in
@@ -588,8 +589,13 @@ An optional top-level `context` object:
 
 | Field | Requirement | Semantics |
 | :--- | :--- | :--- |
-| `context.url` | **OPTIONAL** | Absolute HTTPS URL (localhost development exception) to the vendor's agent-facing integration guide (such as `SKILL.md`). |
+| `context.url` | **REQUIRED when `context` is present** | Absolute HTTPS URL (localhost development exception) to the vendor's agent-facing integration guide (such as `SKILL.md`). |
 | `context.sha256` | **REQUIRED when `context.url` is present** | `sha256:<64 lowercase hex>` over the exact UTF-8 bytes of that guide. |
+
+Because `context` is meaningless without a pointer, `context.url` is required whenever the object is
+present, and `sha256` is required with it: a URL without a hash cannot be pinned, and a hash without a
+URL cannot be fetched. The receipt JSON Schema enforces the same pair; an empty `context` object is not
+a way to omit the pointer — omit `context` entirely instead.
 
 **Domain constraint (normative authority).** `context.url` **MUST** stay on the vendor's registrable
 domain, and the authority for that domain is the signup endpoint's origin (`endpoints.agent_signup`),
@@ -865,6 +871,11 @@ Cross-field rules JSON Schema cannot express are normative here and enforced by 
 `exp - iat = 86400`, `rp.id = sub`, unique `keys[].kid`, `legal_name` at `entity`,
 `entity_reviewed_at` null at `domain`.
 
+**Origins in a signed identity artifact are HTTPS-only.** `iss` and `rp.origin` are canonical
+`https://` origins; the localhost development exception (§5.4) applies to discovery, terms, and
+endpoint URLs and to origin-challenge fetches, never to a broker-signed attestation. The published
+JSON Schema and the Zod schemas enforce the same rule.
+
 ### 14.2 Verification
 
 Verification is normative and ordered:
@@ -1005,7 +1016,7 @@ issuance, not that read.
 
 ### 15.5 Errors
 
-Errors use the OAuth-style body in §18.4 with a stable `code`: `400 invalid_request` /
+Errors use the OAuth-style body in §18.5 with a stable `code`: `400 invalid_request` /
 `invalid_jwk` / `purpose_mismatch`; `401 invalid_api_key`; `403 insufficient_provider_scope` /
 `provider_suspended` / `provider_not_eligible`; `404 not_found` / `key_not_found` /
 `attestation_not_found`; `409 audience_conflict` / `origin_conflict` / `key_exists` /
@@ -1032,10 +1043,16 @@ six fields are **REQUIRED**:
 | `protocol_versions` | Non-empty, unique, **MUST** contain `agent-identity-v1`. |
 | `contact` | Email address or absolute HTTPS URL. |
 
-- `issuer` differing from the document origin **invalidates the document**.
+- `issuer` differing from the document origin **invalidates the document**. `issuer` is a canonical
+  HTTPS origin, exactly like an attestation `iss` (§14.1); the localhost development exception does not
+  apply to metadata.
 - Clients cache metadata for at most **1 hour** and re-fetch on an unknown `kid`. This is a client
   courtesy, not a protocol claim. The attestation status cache stays at **5 minutes**.
-- Without metadata, clients fall back to `<issuer>/.well-known/jwks.json` and
+- A client that verifies an attestation resolves JWKS as follows: it **MAY** use the metadata
+  `jwks_uri` only when the fetched document's `issuer` equals the trusted attestation `iss` and
+  `jwks_uri` is HTTPS and same-origin with it; otherwise it **MUST** fall back to
+  `<issuer>/.well-known/jwks.json`. A cross-origin or invalid `jwks_uri` **MUST NOT** be followed.
+  Without metadata, clients fall back to `<issuer>/.well-known/jwks.json` and
   `<issuer>/api/broker/report-abuse`, where `<issuer>` is the assertion `iss` (Contract A) or the
   attestation `iss` (Contract G) being verified. The fallback is a client rule, not a second format.
 - Cross-origin `attestation_status_uri` and `abuse_endpoint` are allowed but **MUST** pass the same
@@ -1080,6 +1097,9 @@ The plaintext field is named `attestation_jti` so it cannot be confused with the
 - `suspended` maps to `RpVerificationStatus.suspended`. `revoked` maps to `invalid` with
   `reason:"attestation_revoked"` because the frozen enum has no `revoked` (§18). The status response
   itself carries only `status` and `status_changed_at`.
+- Producer and verifier modes apply to the status JWS too: the published JSON Schema and
+  `AttestationStatusClaimsSchema` are closed producer mode, while a verifier validates every known
+  claim and ignores unknown additive claims (`parseAttestationStatusVerifier`).
 
 Caching is `Cache-Control: public, max-age=300, must-revalidate`; clients **MUST NOT** use an older
 cached answer than 300 seconds except to report `unavailable`. An unknown `jti` is `404` with
@@ -1188,13 +1208,29 @@ an RP-signed receipt), `agent_self_reported` (no RP signature), and `legacy_brok
 rows, not verified). `rp_authenticated` and `agent_reported` **MUST NOT** be written for new rows.
 Only `rp_callback` and `rp_signed`, with a verified attestation, can give an abuse report standing.
 
-### 18.3 Attestation status values
+### 18.3 Verification source
+
+`RpVerificationSource` has exactly two values, and no synonyms:
+
+- `broker_fetch` — the broker fetched the discovery document itself (the ordinary `identity_signup`
+  path and Contract F). The fetched document origin is authoritative.
+- `agent_supplied_discovery` — the caller supplied a discovery **object** plus an explicit canonical
+  `rp_origin` (the advanced `identity_prove` path; §5.4, §14.3). The declared origin is used and is
+  never inferred from `terms.url`, `provider_url`, or the attestation.
+
+`require` is broker-enforced and **MUST** reject `agent_supplied_discovery` with
+`discovery_source_not_allowed`; only a broker-fetched discovery document is acceptable (§17.2,
+§17.3). `allow` and `warn` may accept either source, and a same-audience `require` row on another
+origin also refuses a request with no source. `RpVerificationSource` is recorded with the
+`rp_verifications` event; it is not a verification status and never replaces `proof_source`.
+
+### 18.4 Attestation status values
 
 `AttestationStatusValue` is `active`, `suspended`, or `revoked`. It describes the attestation at a
 point in time, not the RP's policy. A registry `verification.status` uses the same values and only
 `active` earns a badge.
 
-### 18.4 HTTP error body
+### 18.5 HTTP error body
 
 Every new route and every path where a client branches uses the OAuth-style body:
 
@@ -1218,9 +1254,10 @@ new routes always emit it. `error_description` never includes key material or in
 Document **conformance** and attestation **verification** are separate outcomes:
 
 - A malformed `rp_attestation` field (not three base64url segments, over 16384 characters, or not a
-  string) is a **conformance** error.
-- A structurally valid JWS whose header, claims, or signature fail is a **verification** error, not a
-  conformance error.
+  string) is a **conformance** error with no verification verdict: the validator reports
+  `attestation.status: not_checked` (reason `field_malformed`), not `invalid`, and exits `1`.
+- A structurally valid JWS whose header, claims, or signature fail is a **verification** error
+  (`invalid`), not a conformance error.
 - An expired attestation is a verification warning; a bad signature, origin mismatch, or audience
   mismatch is a verification failure.
 - A broker/JWKS fetch failure is `unavailable` — a warning by default, never a conformance failure.
@@ -1242,10 +1279,13 @@ attestation result:
 | `--at <rfc3339\|epoch>` | Freeze the clock for deterministic fixture runs; not for production use. |
 
 Exit `0` means the document was fetched, parsed, and conformant and no required check failed. Exit `1`
-means a conformance error or an attestation failure under `--require-attestation`. Exit `2` means the
-run could not obtain what it needed (document fetch failure, or JWKS unavailable under
-`--require-attestation`) and is **never** a conformance verdict. An `unverified`, `expired`, or
-`invalid` attestation stays exit `0` without `--require-attestation`.
+means a conformance error (including a body that is not valid JSON, or a malformed `rp_attestation`
+field) or an attestation failure under `--require-attestation`. Exit `2` means the run could not
+obtain what it needed (document read/fetch failure, or JWKS unavailable under `--require-attestation`)
+and is **never** a conformance verdict: the `conformance` verdict is not evaluated and human output
+prints `DOCUMENT: NOT CHECKED`. An `unverified`, `expired`, or `invalid` attestation stays exit `0`
+without `--require-attestation`. A run that explicitly requests verification warns when the optional
+field is absent (exit unchanged).
 
 The validator never emits `suspended`: that status comes from the broker or the status endpoint.
 
@@ -1257,7 +1297,9 @@ Contract G verification, not just a signature check.
 
 ### 19.4 Caching and key handling
 
-- JWKS are cached **per `iss`** and never merged. `jwks_uri` is same-origin with `issuer`.
+- JWKS are cached **per `iss`** and never merged. `jwks_uri` is same-origin with `issuer` and is used
+  only when the metadata document declares the expected issuer; otherwise the fixed
+  `<iss>/.well-known/jwks.json` path is used (§16.1).
 - `--jwks` applies to exactly one issuer.
 - Metadata is cached at most 1 hour; status responses at most 5 minutes; the attestation `exp` is the
   primary bound.

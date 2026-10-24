@@ -42,7 +42,7 @@ import {
   RECEIPT_JTI_PATTERN,
   UUID_PATTERN,
 } from "./constants";
-import { isCanonicalOrigin } from "./http";
+import { isHttpsCanonicalOrigin } from "./http";
 
 /**
  * Computes the canonical `sha256:<64 lowercase hex>` content hash used to
@@ -329,9 +329,14 @@ export const RpAttestationKeySchema = z
   .strict();
 export type RpAttestationKey = z.infer<typeof RpAttestationKeySchema>;
 
-/** `true` when the value is a canonical origin (lowercase, no path/query/fragment). */
-function canonicalOriginString(message: string) {
-  return z.string().min(1).refine(isCanonicalOrigin, { message });
+/**
+ * A canonical **HTTPS** origin for a signed identity artifact. The localhost
+ * development exception applies to discovery/terms/endpoint URLs, never to the
+ * broker `iss`, the attested `rp.origin`, or the metadata `issuer` (spec §14.1,
+ * §16.1; the published JSON Schemas agree).
+ */
+function httpsCanonicalOriginString(message: string) {
+  return z.string().min(1).refine(isHttpsCanonicalOrigin, { message });
 }
 
 const emailAddress = z
@@ -367,8 +372,8 @@ function buildRpAttestationClaimsSchema(mode: SchemaMode) {
 
   const rp = object({
     id: z.string().regex(UUID_PATTERN, "rp.id must be the provider UUID"),
-    origin: canonicalOriginString(
-      "rp.origin must be a canonical origin (lowercase, no path, query, fragment, or trailing slash)",
+    origin: httpsCanonicalOriginString(
+      "rp.origin must be a canonical HTTPS origin (lowercase, no path, query, fragment, or trailing slash)",
     ),
     audience: z
       .string()
@@ -382,8 +387,8 @@ function buildRpAttestationClaimsSchema(mode: SchemaMode) {
   });
 
   return object({
-    iss: canonicalOriginString(
-      "iss must be the broker issuer origin (lowercase, no path, query, fragment, or trailing slash)",
+    iss: httpsCanonicalOriginString(
+      "iss must be the broker issuer HTTPS origin (lowercase, no path, query, fragment, or trailing slash)",
     ),
     sub: z.string().regex(UUID_PATTERN, "sub must be the provider UUID"),
     aud: z.literal(PROTOCOL_AUDIENCE),
@@ -494,7 +499,9 @@ const metadataContact = z.string().min(1).refine(
  */
 export const BrokerMetadataSchema = z
   .object({
-    issuer: canonicalOriginString("issuer must be the canonical origin of the document itself"),
+    issuer: httpsCanonicalOriginString(
+      "issuer must be the canonical HTTPS origin of the document itself",
+    ),
     jwks_uri: absoluteHttpsUrl,
     attestation_status_uri: absoluteHttpsUrl,
     abuse_endpoint: absoluteHttpsUrl,
@@ -529,22 +536,27 @@ export type BrokerMetadata = z.infer<typeof BrokerMetadataSchema>;
 /**
  * Contract I status JWS claims (spec §5.5). `sub` is the queried attestation
  * `jti`; `exp - iat` is exactly 300 seconds; `status_changed_at <= iat`.
+ *
+ * Like the attestation, the status JWS has a producer and a verifier mode
+ * (ledger §3.15): the published JSON Schema is producer mode; an older verifier
+ * validates every known field and ignores additive claims it does not know.
  */
-export const AttestationStatusClaimsSchema = z
-  .object({
-    iss: canonicalOriginString("iss must be the broker issuer origin"),
-    aud: z.literal(PROTOCOL_AUDIENCE),
-    jti: z.string().regex(UUID_PATTERN, "jti must be a UUIDv4"),
-    sub: z
-      .string()
-      .regex(ATTESTATION_JTI_PATTERN, "sub must be the queried attestation jti (`rpa_` + 26)"),
-    iat: z.number().int(),
-    exp: z.number().int(),
-    status: AttestationStatusValueSchema,
-    status_changed_at: utcTimestamp,
-  })
-  .strict()
-  .superRefine((value, ctx) => {
+function buildAttestationStatusClaimsSchema(mode: SchemaMode) {
+  const base = z
+    .object({
+      iss: httpsCanonicalOriginString("iss must be the broker issuer HTTPS origin"),
+      aud: z.literal(PROTOCOL_AUDIENCE),
+      jti: z.string().regex(UUID_PATTERN, "jti must be a UUIDv4"),
+      sub: z
+        .string()
+        .regex(ATTESTATION_JTI_PATTERN, "sub must be the queried attestation jti (`rpa_` + 26)"),
+      iat: z.number().int(),
+      exp: z.number().int(),
+      status: AttestationStatusValueSchema,
+      status_changed_at: utcTimestamp,
+    });
+  const object = mode === "producer" ? base.strict() : base.passthrough();
+  return object.superRefine((value, ctx) => {
     if (value.exp - value.iat !== ATTESTATION_STATUS_LIFETIME_SECONDS) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -561,7 +573,23 @@ export const AttestationStatusClaimsSchema = z
       });
     }
   });
+}
+
+/** Producer mode: closed, for v1.2 producers and the published JSON Schema. */
+export const AttestationStatusClaimsSchema = buildAttestationStatusClaimsSchema("producer");
 export type AttestationStatusClaims = z.infer<typeof AttestationStatusClaimsSchema>;
+
+/** Verifier mode: validates known fields, ignores unknown additive claims. */
+export const AttestationStatusClaimsVerifierSchema =
+  buildAttestationStatusClaimsSchema("verifier");
+
+/**
+ * Tolerant status-JWS verifier parser (producer/verifier parity with the
+ * attestation parsers). Throws only on a known-field violation.
+ */
+export function parseAttestationStatusVerifier(value: unknown): AttestationStatusClaims {
+  return AttestationStatusClaimsVerifierSchema.parse(value);
+}
 
 /**
  * The status endpoint response body (spec §5.5). `attestation_jti` is advisory:

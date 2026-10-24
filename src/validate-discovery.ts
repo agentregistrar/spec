@@ -107,7 +107,17 @@ interface RunResult {
   metadata: DocumentMetadata | null;
   checks: Check[];
   probes: Probe[];
-  conformance: { valid: boolean; errors: string[]; warnings: string[] };
+  /**
+   * Document-only conformance verdict. `valid` is `null` and `evaluated` is
+   * `false` when the run never obtained a document (exit `2`), because a fetch
+   * failure is not a conformance verdict.
+   */
+  conformance: {
+    valid: boolean | null;
+    evaluated: boolean;
+    errors: string[];
+    warnings: string[];
+  };
   attestation: AttestationVerificationResult;
   fetchFailure: string | null;
 }
@@ -1400,6 +1410,12 @@ function buildTransportChecks(outcome: {
 // Modes.
 // ---------------------------------------------------------------------------
 
+/**
+ * Exit-2 result: the run never obtained the document (missing file, read error,
+ * network/status/size failure). This is an operational result, **not** a
+ * conformance verdict, so `conformance.valid` stays `null` and `evaluated` is
+ * `false`. The operational error is recorded in `fetchFailure`.
+ */
 function fetchFailureResult(
   mode: "file" | "url",
   input: string,
@@ -1416,9 +1432,46 @@ function fetchFailureResult(
     metadata: null,
     checks: [fail("source", "source", message)],
     probes: [],
-    conformance: { valid: false, errors: [`source: ${message}`], warnings: [] },
+    conformance: { valid: null, evaluated: false, errors: [], warnings: [] },
     attestation: emptyAttestation(options, "document_unavailable"),
     fetchFailure: message,
+  };
+}
+
+/**
+ * Exit-1 result: the document arrived but its body is not JSON. Unparseable
+ * JSON is a **conformance** error (spec §5.14), not a fetch failure, so this
+ * reports a real `conformance.valid: false` verdict and leaves `fetchFailure`
+ * null. Exit `2` stays reserved for "could not obtain" (read/network/status/
+ * size) failures.
+ */
+function parseFailureResult(
+  mode: "file" | "url",
+  input: string,
+  message: string,
+  options: ParsedOptions,
+  transportChecks: Check[],
+): RunResult {
+  const checks = [...transportChecks, fail("json.parse", "json.parse", message)];
+  const errors = checks
+    .filter((check) => check.status === "fail")
+    .map((check) => `${check.id}: ${check.message}`);
+  const warnings = checks
+    .filter((check) => check.status === "warn")
+    .map((check) => `${check.id}: ${check.message}`);
+  return {
+    mode,
+    source: input,
+    input,
+    valid: false,
+    exitCode: 1,
+    document: null,
+    metadata: null,
+    checks,
+    probes: [],
+    conformance: { valid: false, evaluated: true, errors, warnings },
+    attestation: emptyAttestation(options, "document_unparsed"),
+    fetchFailure: null,
   };
 }
 
@@ -1454,19 +1507,20 @@ async function runFileMode(options: ParsedOptions, input: string): Promise<RunRe
       options,
     );
   }
+  const sourceCheck = ok("source", "source", `read local file (${Buffer.byteLength(raw, "utf8")} bytes)`);
   let document: unknown;
   try {
     document = JSON.parse(raw);
   } catch (error) {
-    return fetchFailureResult(
+    return parseFailureResult(
       "file",
       input,
       `not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
       options,
+      [sourceCheck],
     );
   }
 
-  const sourceCheck = ok("source", "source", `read local file (${Buffer.byteLength(raw, "utf8")} bytes)`);
   // File mode has no input origin, so body-derived `http://` probe targets are
   // never treated as a localhost development origin.
   const { checks, probes, metadata, attestation } = await checkDocument(
@@ -1488,18 +1542,19 @@ async function runUrlMode(options: ParsedOptions, input: string): Promise<RunRes
   if (!outcome.ok) {
     return fetchFailureResult("url", input, `${outcome.kind}: ${outcome.message}`, options);
   }
+  const transportChecks = buildTransportChecks(outcome);
   let document: unknown;
   try {
     document = JSON.parse(outcome.text);
   } catch (error) {
-    return fetchFailureResult(
+    return parseFailureResult(
       "url",
       input,
-      `could not fetch a usable document: response body is not valid JSON (${error instanceof Error ? error.message : String(error)})`,
+      `the response body is not valid JSON (${error instanceof Error ? error.message : String(error)})`,
       options,
+      transportChecks,
     );
   }
-  const transportChecks = buildTransportChecks(outcome);
   // The top-level input origin gates the probes' localhost dev exception.
   const { checks, probes, metadata, attestation } = await checkDocument(
     document,
@@ -1557,6 +1612,7 @@ function finish(
     probes,
     conformance: {
       valid: conformanceValid,
+      evaluated: true,
       errors: conformanceErrors,
       warnings: conformanceWarnings,
     },
@@ -1608,6 +1664,7 @@ function toJson(result: RunResult): Record<string, unknown> {
     exitCode: result.exitCode,
     conformance: {
       valid: result.conformance.valid,
+      evaluated: result.conformance.evaluated,
       errors: result.conformance.errors,
       warnings: result.conformance.warnings,
     },
@@ -1720,9 +1777,17 @@ function printHuman(result: RunResult): void {
       lines.push(`  [${statusLabel(check.status)}] ${check.id}  ${check.message}`);
     }
   }
+  for (const warning of result.attestation.warnings) {
+    lines.push(`  [WARN] attestation.warning  ${warning}`);
+  }
 
   const counts = summarize(result);
-  const documentVerdict = result.conformance.valid ? "VALID" : "INVALID";
+  const documentVerdict =
+    result.conformance.valid === null
+      ? "NOT CHECKED (n/a: no document, so no conformance verdict)"
+      : result.conformance.valid
+        ? "VALID"
+        : "INVALID";
   const resultVerdict =
     result.exitCode === 0 ? "OK" : result.exitCode === 2 ? "COULD NOT FETCH" : "FAILED";
   lines.push("");
