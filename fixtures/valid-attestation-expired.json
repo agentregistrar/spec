@@ -1,0 +1,26 @@
+{
+  "protocol": "agent-identity-v1",
+  "audience": "vaporcloud",
+  "provider_name": "VaporCloud",
+  "provider_url": "https://vaporcloud.example",
+  "updated_at": "2026-10-24T00:00:00Z",
+  "issuer_allowlist": [
+    "https://id.agentregistrar.dev"
+  ],
+  "required_scopes": [
+    "tos:accept"
+  ],
+  "terms": {
+    "version": "2026.1",
+    "url": "https://vaporcloud.example/terms",
+    "sha256": "sha256:956d4a2d460a34d94aeb8b57fff29c0c7b846f5c8d1cd080ce264bf3314642f0",
+    "text": "VaporCloud Terms of Service, version 2026.1. By accepting these terms, your verified human principal is bound to them and to VaporCloud's acceptable-use and appliance-safety rules."
+  },
+  "endpoints": {
+    "agent_signup": "https://vaporcloud.example/api/signup/agent"
+  },
+  "rp_attestation": "eyJhbGciOiJFZERTQSIsInR5cCI6ImFnZW50LXJwLWF0dGVzdGF0aW9uK2p3dCIsImtpZCI6ImJyb2tlci0xLWtleS0yMDI2LTEwIn0.eyJpc3MiOiJodHRwczovL3JwLWJyb2tlci5leGFtcGxlIiwic3ViIjoiMGYzZDJjMWItNGE1OS00ZTZmLThhN2ItMmMxZDBlOWY4YTdiIiwiYXVkIjoiYWdlbnQtaWRlbnRpdHktdjEiLCJqdGkiOiJycGFfenk2MXl2MHZkYmpjcDQ5Y3FuMGV4dGh2YjciLCJpYXQiOjE3ODg5MTIwMDAsImV4cCI6MTc4ODk5ODQwMCwicnAiOnsiaWQiOiIwZjNkMmMxYi00YTU5LTRlNmYtOGE3Yi0yYzFkMGU5ZjhhN2IiLCJvcmlnaW4iOiJodHRwczovL3ZhcG9yY2xvdWQuZXhhbXBsZSIsImF1ZGllbmNlIjoidmFwb3JjbG91ZCIsIm5hbWUiOiJWYXBvckNsb3VkIiwibGVnYWxfbmFtZSI6IlZhcG9yQ2xvdWQgSW5jLiIsImNvbnRhY3QiOnsiZW1haWwiOiJzZWN1cml0eUB2YXBvcmNsb3VkLmV4YW1wbGUiLCJuYW1lIjoiVmFwb3JDbG91ZCBTZWN1cml0eSJ9LCJ2ZXJpZmljYXRpb24iOnsibGV2ZWwiOiJkb21haW4iLCJtZXRob2QiOiJodHRwcyIsIm9yaWdpbl92ZXJpZmllZF9hdCI6IjIwMjYtMTAtMjNUMDA6MDA6MDAuMDAwWiIsImVudGl0eV9yZXZpZXdlZF9hdCI6bnVsbH19LCJrZXlzIjpbeyJraWQiOiJycC1rZXktMSIsImt0eSI6Ik9LUCIsImNydiI6IkVkMjU1MTkiLCJ4Ijoib3kzY3JfVnJESXR5ZjNQLWVNZlpjY1VkczNWQUZLcFE2R2NTaXljRzYxUSIsImFsZyI6IkVkRFNBIiwicHVycG9zZXMiOlsicmVjZWlwdCIsImFidXNlIl19XX0.y1CqhR6Rn7AMonThzbJU_7cCJs9TvpBWlhrNvwPRzxxl7SUpklednGORsW6Ms3zmq1wZ7obsBF0gu8yrKO1CCg",
+  "__fixture_origin": "https://vaporcloud.example",
+  "__fixture_attestation_source": "attestations/expired.jwt",
+  "__fixture_note": "VALID: the document is conformant; the attestation expired 2026-09-10, so verification reports `expired` (a warning unless --require-attestation)."
+}

@@ -23,78 +23,40 @@
  * same-origin redirect limit.
  */
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  DEV_LOCALHOST_HOSTNAMES,
+  MAX_REDIRECTS,
+  fetchResource,
+  isAbsoluteOrigin,
+  isAbsoluteProtocolUrl,
+  isCanonicalOrigin,
+  isRecord,
+  normalizeOrigin,
+  parseAbsoluteHttpUrl,
+} from "./http";
+import { loadRootSchema, validateJsonSchema, type SchemaError } from "./json-schema";
 import { AgentSignupDiscoverySchema } from "./schema";
-
-/** Bumped when validator behavior changes; surfaced in `--json` evidence. */
-const VALIDATOR_VERSION = "1.0.0";
-const VALIDATOR_ID = "agent-identity-v1";
+import {
+  ATTESTATION_FIELD_MAX_LENGTH,
+  COMPACT_JWS_PATTERN,
+} from "./constants";
+import {
+  parseClockValue,
+  verifyRpAttestation,
+  type AttestationVerificationResult,
+} from "./validate-attestation";
+import { VALIDATOR_ID, VALIDATOR_VERSION } from "./version";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_BYTES = 1024 * 1024; // spec §4: 1 MiB cap
-const MAX_REDIRECTS = 3; // spec §4: at most three hops
-const DEV_LOCALHOST_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);
 
 // ---------------------------------------------------------------------------
 // Shared mirror helpers (kept in lockstep with ./schema.ts).
 // ---------------------------------------------------------------------------
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseAbsoluteHttpUrl(value: unknown): URL | null {
-  if (typeof value !== "string" || value.length === 0) {
-    return null;
-  }
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return null;
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    return null;
-  }
-  return url;
-}
-
-function isDevelopmentOrigin(url: URL): boolean {
-  return url.protocol === "http:" && DEV_LOCALHOST_HOSTNAMES.has(url.hostname);
-}
-
-function isAbsoluteProtocolUrl(value: unknown): boolean {
-  const url = parseAbsoluteHttpUrl(value);
-  if (url === null) {
-    return false;
-  }
-  return url.protocol === "https:" || isDevelopmentOrigin(url);
-}
-
-function isAbsoluteOrigin(value: unknown): boolean {
-  if (typeof value !== "string" || value.length === 0 || value.includes("*")) {
-    return false;
-  }
-  const trimmed = value.replace(/\/+$/, "");
-  const url = parseAbsoluteHttpUrl(trimmed);
-  if (url === null) {
-    return false;
-  }
-  if (url.protocol !== "https:" && !isDevelopmentOrigin(url)) {
-    return false;
-  }
-  if (url.pathname !== "/" && url.pathname !== "") {
-    return false;
-  }
-  return url.search === "" && url.hash === "";
-}
-
-function normalizeOrigin(value: string): string {
-  return value.replace(/\/+$/, "");
-}
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const SHA256_HEX_PATTERN = /^sha256:[0-9a-f]{64}$/;
@@ -145,6 +107,8 @@ interface RunResult {
   metadata: DocumentMetadata | null;
   checks: Check[];
   probes: Probe[];
+  conformance: { valid: boolean; errors: string[]; warnings: string[] };
+  attestation: AttestationVerificationResult;
   fetchFailure: string | null;
 }
 
@@ -156,6 +120,24 @@ interface ParsedOptions {
   probeEndpoints: boolean;
   timeoutMs: number;
   maxBytes: number;
+  verifyAttestation: boolean;
+  requireAttestation: boolean;
+  trustedBrokers: string[];
+  jwks: string | null;
+  at: number | null;
+}
+
+/** Env fallback for the trusted RP-broker list (spec §5.14). */
+const TRUSTED_BROKERS_ENV = "AGENT_IDENTITY_TRUSTED_RP_BROKERS";
+
+function parseBrokerList(value: string | undefined): string[] {
+  if (value === undefined) {
+    return [];
+  }
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +155,15 @@ function parseArgs(argv: string[]): ParsedOptions {
     probeEndpoints: false,
     timeoutMs: DEFAULT_TIMEOUT_MS,
     maxBytes: DEFAULT_MAX_BYTES,
+    verifyAttestation: false,
+    requireAttestation: false,
+    trustedBrokers: [],
+    jwks: null,
+    at: null,
   };
+
+  let brokerFlagSeen = false;
+  const brokerFlags: string[] = [];
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -185,6 +175,48 @@ function parseArgs(argv: string[]): ParsedOptions {
       options.probeJwks = true;
     } else if (arg === "--probe-endpoints") {
       options.probeEndpoints = true;
+    } else if (arg === "--verify-attestation") {
+      options.verifyAttestation = true;
+    } else if (arg === "--require-attestation") {
+      options.requireAttestation = true;
+      options.verifyAttestation = true;
+    } else if (arg === "--trusted-rp-broker") {
+      const value = argv[i + 1];
+      i += 1;
+      if (value === undefined || value.startsWith("-")) {
+        throw new UsageError("--trusted-rp-broker expects an issuer origin");
+      }
+      brokerFlagSeen = true;
+      brokerFlags.push(value);
+    } else if (arg.startsWith("--trusted-rp-broker=")) {
+      brokerFlagSeen = true;
+      brokerFlags.push(arg.slice("--trusted-rp-broker=".length));
+    } else if (arg === "--jwks") {
+      const value = argv[i + 1];
+      i += 1;
+      if (value === undefined) {
+        throw new UsageError("--jwks expects a path or URL");
+      }
+      options.jwks = value;
+    } else if (arg.startsWith("--jwks=")) {
+      options.jwks = arg.slice("--jwks=".length);
+    } else if (arg === "--at") {
+      const value = argv[i + 1];
+      i += 1;
+      if (value === undefined) {
+        throw new UsageError("--at expects an RFC 3339 timestamp or epoch seconds");
+      }
+      const parsed = parseClockValue(value);
+      if (parsed === null) {
+        throw new UsageError("--at expects an RFC 3339 timestamp or epoch seconds");
+      }
+      options.at = parsed;
+    } else if (arg.startsWith("--at=")) {
+      const parsed = parseClockValue(arg.slice("--at=".length));
+      if (parsed === null) {
+        throw new UsageError("--at expects an RFC 3339 timestamp or epoch seconds");
+      }
+      options.at = parsed;
     } else if (arg === "--timeout") {
       const value = Number(argv[i + 1]);
       i += 1;
@@ -220,6 +252,12 @@ function parseArgs(argv: string[]): ParsedOptions {
     }
   }
 
+  // Flags override the env fallback: if any --trusted-rp-broker is present the
+  // env list is ignored entirely (an empty effective list means nothing trusted).
+  options.trustedBrokers = brokerFlagSeen
+    ? brokerFlags
+    : parseBrokerList(process.env[TRUSTED_BROKERS_ENV]);
+
   return options;
 }
 
@@ -240,234 +278,38 @@ function printHelp(): void {
     "                      issuer and require >=1 usable verification key",
     "  --probe-endpoints   opt-in: non-destructively HEAD/OPTIONS the advertised",
     "                      agent_signup endpoint (never POST / never signup)",
+    "  --verify-attestation",
+    "                      parse and verify rp_attestation if present (opt-in; may",
+    "                      fetch the issuer JWKS). Absent field = unverified.",
+    "  --require-attestation",
+    "                      implies --verify-attestation; a non-verified result fails",
+    "  --trusted-rp-broker <issuer>",
+    "                      repeatable trusted RP-broker origin. Flags override the",
+    "                      env fallback; an empty effective list trusts nothing.",
+    "  --jwks <path-or-url>",
+    "                      pin exactly one issuer's JWKS for offline runs (never",
+    "                      bypasses signature checks, never merges issuers)",
+    "  --at <rfc3339|epoch>",
+    "                      freeze the clock for deterministic runs (fixtures only)",
     "  --timeout <ms>      per-fetch timeout (default " + DEFAULT_TIMEOUT_MS + ")",
     "  --max-bytes <n>     bounded read size per fetch (default " + DEFAULT_MAX_BYTES + ")",
     "  -h, --help          show this help",
     "",
+    "Environment:",
+    `  ${TRUSTED_BROKERS_ENV}  comma-separated trusted RP-broker origins`,
+    "                      (used only when no --trusted-rp-broker flag is present)",
+    "",
     "Exit codes:",
-    "  0  valid conformant document",
-    "  1  document retrieved and parsed, but failed conformance",
-    "  2  could not fetch a usable document (network/HTTP/redirect/size/parse)",
+    "  0  valid conformant document; no required check failed",
+    "  1  conformance failure, or a required attestation check failed",
+    "  2  could not obtain what the run needed (document fetch, or JWKS under",
+    "     --require-attestation). Never a conformance verdict.",
     "",
     "Safety: only the URL you provide and explicitly requested probe targets are",
     "fetched. URLs found in the document body (including under `extensions`) are",
     "never followed. `terms.text` is treated as data, never executed.",
   ];
   console.log(lines.join("\n"));
-}
-
-// ---------------------------------------------------------------------------
-// Bounded, SSRF-safe fetch.
-// ---------------------------------------------------------------------------
-
-type FetchFailureKind =
-  | "network"
-  | "timeout"
-  | "redirect"
-  | "status"
-  | "content-type"
-  | "size";
-
-type FetchOutcome =
-  | {
-      ok: true;
-      status: number;
-      headers: Headers;
-      text: string;
-      bytes: number;
-      finalUrl: string;
-      redirects: number;
-    }
-  | { ok: false; kind: FetchFailureKind; message: string };
-
-interface FetchOptions {
-  timeoutMs: number;
-  maxBytes: number;
-  requireJson: boolean;
-  method?: string;
-  acceptStatus?: (status: number) => boolean;
-  /**
-   * When `false`, a 3xx response is passed to `acceptStatus` instead of being
-   * followed. Used by the endpoint liveness probe, which only needs to observe
-   * that the route answered (spec §5.1 defines `agent_signup` as a `POST`
-   * target, so a redirect is not itself a failure).
-   */
-  followRedirects?: boolean;
-}
-
-/** Enforces the HTTPS requirement (localhost dev exception) before fetching. */
-function assertFetchableUrl(rawUrl: string): string | null {
-  const url = parseAbsoluteHttpUrl(rawUrl);
-  if (url === null) {
-    return "target is not a valid absolute http(s) URL";
-  }
-  if (url.protocol !== "https:" && !isDevelopmentOrigin(url)) {
-    return "https is required (only http://localhost and http://127.0.0.1 are allowed for development)";
-  }
-  return null;
-}
-
-async function readBounded(
-  response: Response,
-  maxBytes: number,
-): Promise<{ text: string; bytes: number; truncated: boolean }> {
-  const body = response.body;
-  if (body === null) {
-    return { text: "", bytes: 0, truncated: false };
-  }
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-    if (value) {
-      total += value.byteLength;
-      if (total > maxBytes) {
-        await reader.cancel();
-        return { text: "", bytes: total, truncated: true };
-      }
-      chunks.push(value);
-    }
-  }
-  const buffer = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
-  return { text: buffer.toString("utf8"), bytes: total, truncated: false };
-}
-
-/**
- * Fetches a resource with a timeout, a bounded read, and a same-origin
- * redirect limit. Returns a discriminated outcome rather than throwing.
- */
-async function fetchResource(
-  rawUrl: string,
-  options: FetchOptions,
-): Promise<FetchOutcome> {
-  const guard = assertFetchableUrl(rawUrl);
-  if (guard !== null) {
-    return { ok: false, kind: "network", message: guard };
-  }
-
-  const acceptStatus = options.acceptStatus ?? ((status: number) => status === 200);
-  const initialOrigin = new URL(rawUrl).origin;
-  let current = rawUrl;
-  let redirects = 0;
-
-  for (;;) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), options.timeoutMs);
-    try {
-      let response: Response;
-      try {
-        response = await fetch(current, {
-          method: options.method ?? "GET",
-          redirect: "manual",
-          signal: controller.signal,
-          headers: {
-            accept: "application/json, text/plain;q=0.5, */*;q=0.1",
-            "user-agent": `agent-identity-conformance-validator/${VALIDATOR_VERSION}`,
-          },
-        });
-      } catch (error) {
-        if (error instanceof Error && error.name === "AbortError") {
-          return {
-            ok: false,
-            kind: "timeout",
-            message: `request timed out after ${options.timeoutMs}ms`,
-          };
-        }
-        return {
-          ok: false,
-          kind: "network",
-          message: error instanceof Error ? error.message : String(error),
-        };
-      }
-
-      if (
-        options.followRedirects !== false &&
-        response.status >= 300 &&
-        response.status < 400
-      ) {
-        const location = response.headers.get("location");
-        if (location === null) {
-          return {
-            ok: false,
-            kind: "redirect",
-            message: `received ${response.status} redirect without a Location header`,
-          };
-        }
-        if (redirects >= MAX_REDIRECTS) {
-          return {
-            ok: false,
-            kind: "redirect",
-            message: `exceeded the ${MAX_REDIRECTS}-hop redirect limit`,
-          };
-        }
-        let next: URL;
-        try {
-          next = new URL(location, current);
-        } catch {
-          return {
-            ok: false,
-            kind: "redirect",
-            message: `redirect Location is not a valid URL: ${location}`,
-          };
-        }
-        if (next.origin !== initialOrigin) {
-          return {
-            ok: false,
-            kind: "redirect",
-            message: `redirect leaves the original origin (${initialOrigin} -> ${next.origin})`,
-          };
-        }
-        redirects += 1;
-        current = next.toString();
-        continue;
-      }
-
-      if (!acceptStatus(response.status)) {
-        return {
-          ok: false,
-          kind: "status",
-          message: `expected status ${options.acceptStatus ? "an accepted value" : "200"} but received ${response.status}`,
-        };
-      }
-
-      if (options.requireJson) {
-        const contentType = response.headers.get("content-type") ?? "";
-        const mime = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
-        if (mime !== "application/json") {
-          return {
-            ok: false,
-            kind: "content-type",
-            message: `expected Content-Type application/json but received ${contentType || "(none)"}`,
-          };
-        }
-      }
-
-      const bounded = await readBounded(response, options.maxBytes);
-      if (bounded.truncated) {
-        return {
-          ok: false,
-          kind: "size",
-          message: `response body exceeds the ${options.maxBytes}-byte cap`,
-        };
-      }
-
-      return {
-        ok: true,
-        status: response.status,
-        headers: response.headers,
-        text: bounded.text,
-        bytes: bounded.bytes,
-        finalUrl: current,
-        redirects,
-      };
-    } finally {
-      clearTimeout(timer);
-    }
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -566,258 +408,6 @@ function scanForbidden(node: unknown, path: string, out: ForbiddenFinding[]): vo
   }
 }
 
-// ---------------------------------------------------------------------------
-// JSON Schema (subset) evaluator — used only to detect divergence from Zod.
-// ---------------------------------------------------------------------------
-
-interface SchemaError {
-  path: string;
-  message: string;
-}
-
-function resolveJsonPointer(root: unknown, ref: string): unknown {
-  if (!ref.startsWith("#/")) {
-    return undefined;
-  }
-  const parts = ref
-    .slice(2)
-    .split("/")
-    .map((part) => part.replace(/~1/g, "/").replace(/~0/g, "~"));
-  let current: unknown = root;
-  for (const part of parts) {
-    if (!isRecord(current) && !Array.isArray(current)) {
-      return undefined;
-    }
-    current = (current as Record<string, unknown>)[part];
-  }
-  return current;
-}
-
-function jsonTypeOf(value: unknown): string {
-  if (value === null) {
-    return "null";
-  }
-  if (Array.isArray(value)) {
-    return "array";
-  }
-  return typeof value;
-}
-
-function matchesJsonType(value: unknown, type: string): boolean {
-  if (type === "integer") {
-    return typeof value === "number" && Number.isInteger(value);
-  }
-  return jsonTypeOf(value) === type;
-}
-
-function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map(stableStringify).join(",")}]`;
-  }
-  if (isRecord(value)) {
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value) ?? "null";
-}
-
-function deepEqual(a: unknown, b: unknown): boolean {
-  return stableStringify(a) === stableStringify(b);
-}
-
-// --- JSON Schema `format: date-time` (ajv-formats `full`-mode parity) -------
-//
-// The checked-in JSON Schema declares `updated_at` as `format: date-time`. A
-// real `ajv` + `ajv-formats` run evaluates that format, so this subset
-// evaluator mirrors it in order to keep its Zod-divergence signal honest
-// instead of claiming an agreement it cannot check.
-//
-// It is deliberately NOT the same predicate as the authoritative Zod
-// `z.string().datetime({ offset: true })` used by `AgentSignupDiscoverySchema`:
-// ajv-formats accepts a lowercase `t`/`z` and a space separator and rejects an
-// out-of-range offset, while Zod requires an uppercase `T` and a `Z`/numeric
-// offset and (by regex) accepts `+25:00`. Where the two differ, Zod plus the
-// written spec (§5.2) win, and the `schema.json-schema` check reports the
-// divergence rather than overstating agreement.
-
-const JSON_SCHEMA_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
-const JSON_SCHEMA_TIME_PATTERN =
-  /^(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)(z|([+-])(\d{2})(?::?(\d{2}))?)?$/i;
-const JSON_SCHEMA_DAYS_IN_MONTH = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-
-function isLeapYear(year: number): boolean {
-  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-}
-
-function isJsonSchemaFullDate(value: string): boolean {
-  const match = JSON_SCHEMA_DATE_PATTERN.exec(value);
-  if (match === null) {
-    return false;
-  }
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const daysInMonth =
-    month === 2 && isLeapYear(year) ? 29 : JSON_SCHEMA_DAYS_IN_MONTH[month] ?? 0;
-  return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth;
-}
-
-function isJsonSchemaFullTime(value: string): boolean {
-  const match = JSON_SCHEMA_TIME_PATTERN.exec(value);
-  if (match === null) {
-    return false;
-  }
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  const second = Number(match[3]);
-  const offset = match[4];
-  const offsetSign = match[5] === "-" ? -1 : 1;
-  const offsetHour = Number(match[6] ?? 0);
-  const offsetMinute = Number(match[7] ?? 0);
-  // `full` mode requires an explicit, range-checked timezone.
-  if (offset === undefined || offsetHour > 23 || offsetMinute > 59) {
-    return false;
-  }
-  if (hour <= 23 && minute <= 59 && second < 60) {
-    return true;
-  }
-  // RFC 3339 permits a leap second only at 23:59:60 UTC.
-  const utcMinute = minute - offsetMinute * offsetSign;
-  const utcHour = hour - offsetHour * offsetSign - (utcMinute < 0 ? 1 : 0);
-  return (
-    (utcHour === 23 || utcHour === -1) &&
-    (utcMinute === 59 || utcMinute === -1) &&
-    second < 61
-  );
-}
-
-function isJsonSchemaDateTime(value: string): boolean {
-  const parts = value.split(/t|\s/i);
-  return (
-    parts.length === 2 &&
-    isJsonSchemaFullDate(parts[0]) &&
-    isJsonSchemaFullTime(parts[1])
-  );
-}
-
-function validateJsonSchema(
-  node: unknown,
-  schema: unknown,
-  root: unknown,
-  path: string,
-  errors: SchemaError[],
-): void {
-  if (schema === true || schema === undefined) {
-    return;
-  }
-  if (schema === false) {
-    errors.push({ path, message: "must not be present" });
-    return;
-  }
-  if (!isRecord(schema)) {
-    return;
-  }
-
-  if (typeof schema.$ref === "string") {
-    validateJsonSchema(node, resolveJsonPointer(root, schema.$ref), root, path, errors);
-    return;
-  }
-
-  if (typeof schema.type === "string" && !matchesJsonType(node, schema.type)) {
-    errors.push({ path, message: `must be of type ${schema.type}` });
-    return;
-  }
-
-  if ("const" in schema && !deepEqual(node, schema.const)) {
-    errors.push({ path, message: `must equal ${JSON.stringify(schema.const)}` });
-  }
-
-  if (
-    typeof schema.minLength === "number" &&
-    typeof node === "string" &&
-    node.length < schema.minLength
-  ) {
-    errors.push({ path, message: `must be at least ${schema.minLength} characters` });
-  }
-
-  if (typeof schema.pattern === "string" && typeof node === "string") {
-    try {
-      if (!new RegExp(schema.pattern).test(node)) {
-        errors.push({ path, message: `must match pattern ${schema.pattern}` });
-      }
-    } catch {
-      // Ignore malformed patterns in the checked-in schema.
-    }
-  }
-
-  if (schema.format === "date-time" && typeof node === "string" && !isJsonSchemaDateTime(node)) {
-    errors.push({ path, message: 'must match format "date-time"' });
-  }
-
-  if (Array.isArray(node)) {
-    if (typeof schema.minItems === "number" && node.length < schema.minItems) {
-      errors.push({ path, message: `must contain at least ${schema.minItems} items` });
-    }
-    if (schema.uniqueItems === true) {
-      for (let i = 0; i < node.length; i += 1) {
-        for (let j = i + 1; j < node.length; j += 1) {
-          if (deepEqual(node[i], node[j])) {
-            errors.push({ path, message: `items must be unique (duplicate at ${i} and ${j})` });
-          }
-        }
-      }
-    }
-    if (isRecord(schema.items)) {
-      node.forEach((item, index) =>
-        validateJsonSchema(item, schema.items, root, `${path}[${index}]`, errors),
-      );
-    }
-    if (isRecord(schema.contains)) {
-      const anyMatch = node.some((item) => {
-        const probeErrors: SchemaError[] = [];
-        validateJsonSchema(item, schema.contains, root, path, probeErrors);
-        return probeErrors.length === 0;
-      });
-      if (!anyMatch) {
-        errors.push({ path, message: "must contain a matching item" });
-      }
-    }
-  }
-
-  if (isRecord(node)) {
-    if (Array.isArray(schema.required)) {
-      for (const required of schema.required) {
-        if (typeof required === "string" && !(required in node)) {
-          errors.push({ path, message: `missing required property "${required}"` });
-        }
-      }
-    }
-    const properties = isRecord(schema.properties) ? schema.properties : {};
-    for (const [key, value] of Object.entries(node)) {
-      const child = childPath(path, key);
-      if (key in properties) {
-        validateJsonSchema(value, properties[key], root, child, errors);
-      } else if (schema.additionalProperties === false) {
-        errors.push({ path, message: `additional property "${key}" is not allowed` });
-      } else if (isRecord(schema.additionalProperties)) {
-        validateJsonSchema(value, schema.additionalProperties, root, child, errors);
-      }
-    }
-  }
-}
-
-function loadJsonSchema(): unknown | null {
-  try {
-    const schemaPath = fileURLToPath(
-      new URL("../agent-signup.schema.json", import.meta.url),
-    );
-    return JSON.parse(readFileSync(schemaPath, "utf8"));
-  } catch {
-    return null;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Document checks.
@@ -837,6 +427,7 @@ const ALLOWED_TOP_LEVEL_FIELDS = new Set([
   "terms",
   "endpoints",
   "extensions",
+  "rp_attestation",
 ]);
 
 /** Reverse-DNS namespace: at least two dot-separated labels (for example `dev.vaporcloud`). */
@@ -1111,6 +702,89 @@ function checkOptionalFields(document: Record<string, unknown>): Check {
   );
 }
 
+/**
+ * Field-level conformance check for `rp_attestation` (spec §5.3). A malformed
+ * field is a **conformance** error regardless of verification flags; an absent
+ * field is conformant and skip-level here.
+ */
+function checkRpAttestationField(document: Record<string, unknown>): Check {
+  if (!("rp_attestation" in document)) {
+    return skip(
+      "field.rp_attestation",
+      "rp_attestation",
+      "no rp_attestation field (OPTIONAL in v1.2; document is conformant and unverified)",
+    );
+  }
+  const value = document.rp_attestation;
+  if (typeof value !== "string") {
+    return fail(
+      "field.rp_attestation",
+      "rp_attestation",
+      "rp_attestation must be a compact JWS string",
+      { actual: JSON.stringify(value ?? null) },
+    );
+  }
+  if (value.length > ATTESTATION_FIELD_MAX_LENGTH) {
+    return fail(
+      "field.rp_attestation",
+      "rp_attestation",
+      `rp_attestation exceeds the ${ATTESTATION_FIELD_MAX_LENGTH}-character cap (${value.length})`,
+    );
+  }
+  if (!COMPACT_JWS_PATTERN.test(value)) {
+    return fail(
+      "field.rp_attestation",
+      "rp_attestation",
+      "rp_attestation must be three unpadded base64url segments separated by `.`",
+    );
+  }
+  return ok(
+    "field.rp_attestation",
+    "rp_attestation",
+    "rp_attestation is a compact JWS within the size bound",
+  );
+}
+
+/** A synthetic attestation result for runs where the document never arrived. */
+function emptyAttestation(
+  options: ParsedOptions,
+  reason: string,
+): AttestationVerificationResult {
+  const now = options.at ?? Math.floor(Date.now() / 1000);
+  return {
+    present: false,
+    checked: false,
+    required: options.requireAttestation,
+    verified: false,
+    status: "unverified",
+    reason,
+    iss: null,
+    jti: null,
+    origin: null,
+    audience: null,
+    level: null,
+    checked_at: new Date(now * 1000).toISOString(),
+    jwks_source: null,
+    checks: [],
+    errors: [],
+    warnings: [],
+  };
+}
+
+/**
+ * In URL mode the fetch origin is authoritative. In file mode there is no
+ * fetch, so a fixture MAY declare `__fixture_origin`; without it the origin
+ * binding cannot be checked and the attestation is `unavailable` rather than
+ * falsely `verified` (never skip a known check).
+ */
+function declaredOrigin(document: unknown): string | null {
+  if (!isRecord(document)) {
+    return null;
+  }
+  const value = document.__fixture_origin;
+  return typeof value === "string" && isCanonicalOrigin(value) ? value : null;
+}
+
 function checkScopeBoundary(findings: ForbiddenFinding[]): Check {
   if (findings.length === 0) {
     return ok(
@@ -1232,7 +906,13 @@ async function checkDocument(
   options: ParsedOptions,
   transportChecks: Check[],
   inputOrigin: URL | null,
-): Promise<{ checks: Check[]; probes: Probe[]; metadata: DocumentMetadata | null }> {
+  documentOrigin: string | null,
+): Promise<{
+  checks: Check[];
+  probes: Probe[];
+  metadata: DocumentMetadata | null;
+  attestation: AttestationVerificationResult;
+}> {
   const checks: Check[] = [...transportChecks];
 
   const documentIsObject = isRecord(document);
@@ -1244,7 +924,12 @@ async function checkDocument(
   );
 
   if (!documentIsObject) {
-    return { checks, probes: [], metadata: null };
+    return {
+      checks,
+      probes: [],
+      metadata: null,
+      attestation: emptyAttestation(options, "document_invalid"),
+    };
   }
 
   const zodResult = AgentSignupDiscoverySchema.safeParse(document);
@@ -1262,7 +947,7 @@ async function checkDocument(
     );
   }
 
-  const jsonSchema = loadJsonSchema();
+  const jsonSchema = loadRootSchema("agent-signup.schema.json");
   if (jsonSchema === null) {
     addCheck(
       checks,
@@ -1325,6 +1010,7 @@ async function checkDocument(
   );
 
   addCheck(checks, checkOptionalFields(document));
+  addCheck(checks, checkRpAttestationField(document));
   addCheck(checks, checkScopeBoundary(findings));
   addCheck(checks, checkUnknownTopLevel(document, forbiddenTopLevel));
   addCheck(checks, checkExtensionsNamespace(document));
@@ -1356,7 +1042,28 @@ async function checkDocument(
     }
   }
 
-  return { checks, probes, metadata: buildMetadata(document) };
+  return {
+    checks,
+    probes,
+    metadata: buildMetadata(document),
+    attestation: await verifyRpAttestation(
+      document.rp_attestation,
+      {
+        documentOrigin,
+        documentAudience:
+          typeof document.audience === "string" ? document.audience : null,
+      },
+      {
+        trustedBrokers: options.trustedBrokers,
+        jwks: options.jwks,
+        at: options.at,
+        timeoutMs: options.timeoutMs,
+        maxBytes: options.maxBytes,
+        required: options.requireAttestation,
+        check: options.verifyAttestation,
+      },
+    ),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1697,6 +1404,7 @@ function fetchFailureResult(
   mode: "file" | "url",
   input: string,
   message: string,
+  options: ParsedOptions,
 ): RunResult {
   return {
     mode,
@@ -1708,6 +1416,8 @@ function fetchFailureResult(
     metadata: null,
     checks: [fail("source", "source", message)],
     probes: [],
+    conformance: { valid: false, errors: [`source: ${message}`], warnings: [] },
+    attestation: emptyAttestation(options, "document_unavailable"),
     fetchFailure: message,
   };
 }
@@ -1722,6 +1432,7 @@ async function runFileMode(options: ParsedOptions, input: string): Promise<RunRe
       "file",
       input,
       `could not read file: ${error instanceof Error ? error.message : String(error)}`,
+      options,
     );
   }
   if (size > options.maxBytes) {
@@ -1729,6 +1440,7 @@ async function runFileMode(options: ParsedOptions, input: string): Promise<RunRe
       "file",
       input,
       `file exceeds the ${options.maxBytes}-byte cap (${size} bytes)`,
+      options,
     );
   }
   let raw: string;
@@ -1739,6 +1451,7 @@ async function runFileMode(options: ParsedOptions, input: string): Promise<RunRe
       "file",
       input,
       `could not read file: ${error instanceof Error ? error.message : String(error)}`,
+      options,
     );
   }
   let document: unknown;
@@ -1749,14 +1462,21 @@ async function runFileMode(options: ParsedOptions, input: string): Promise<RunRe
       "file",
       input,
       `not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      options,
     );
   }
 
   const sourceCheck = ok("source", "source", `read local file (${Buffer.byteLength(raw, "utf8")} bytes)`);
   // File mode has no input origin, so body-derived `http://` probe targets are
   // never treated as a localhost development origin.
-  const { checks, probes, metadata } = await checkDocument(document, options, [sourceCheck], null);
-  return finish("file", input, document, checks, probes, metadata);
+  const { checks, probes, metadata, attestation } = await checkDocument(
+    document,
+    options,
+    [sourceCheck],
+    null,
+    declaredOrigin(document),
+  );
+  return finish("file", input, document, checks, probes, metadata, attestation, options);
 }
 
 async function runUrlMode(options: ParsedOptions, input: string): Promise<RunResult> {
@@ -1766,7 +1486,7 @@ async function runUrlMode(options: ParsedOptions, input: string): Promise<RunRes
     requireJson: true,
   });
   if (!outcome.ok) {
-    return fetchFailureResult("url", input, `${outcome.kind}: ${outcome.message}`);
+    return fetchFailureResult("url", input, `${outcome.kind}: ${outcome.message}`, options);
   }
   let document: unknown;
   try {
@@ -1776,17 +1496,19 @@ async function runUrlMode(options: ParsedOptions, input: string): Promise<RunRes
       "url",
       input,
       `could not fetch a usable document: response body is not valid JSON (${error instanceof Error ? error.message : String(error)})`,
+      options,
     );
   }
   const transportChecks = buildTransportChecks(outcome);
   // The top-level input origin gates the probes' localhost dev exception.
-  const { checks, probes, metadata } = await checkDocument(
+  const { checks, probes, metadata, attestation } = await checkDocument(
     document,
     options,
     transportChecks,
     parseAbsoluteHttpUrl(input),
+    parseAbsoluteHttpUrl(outcome.finalUrl)?.origin ?? null,
   );
-  return finish("url", input, document, checks, probes, metadata);
+  return finish("url", input, document, checks, probes, metadata, attestation, options);
 }
 
 function finish(
@@ -1796,20 +1518,49 @@ function finish(
   checks: Check[],
   probes: Probe[],
   metadata: DocumentMetadata | null,
+  attestation: AttestationVerificationResult,
+  options: ParsedOptions,
 ): RunResult {
-  const hasFailure =
-    checks.some((check) => check.status === "fail") ||
-    probes.some((probe) => probe.status === "fail");
+  const conformanceErrors = checks
+    .filter((check) => check.status === "fail")
+    .map((check) => `${check.id}: ${check.message}`)
+    .concat(
+      probes
+        .filter((probe) => probe.status === "fail")
+        .map((probe) => `${probe.id}: ${probe.message}`),
+    );
+  const conformanceWarnings = checks
+    .filter((check) => check.status === "warn")
+    .map((check) => `${check.id}: ${check.message}`);
+  const conformanceValid = conformanceErrors.length === 0;
+
+  // Exit mapping (spec §5.14): conformance or a failed required verification is
+  // `1`; a required run that could not obtain its evidence is `2`; everything
+  // else is `0` (an unverified/expired/invalid attestation is a warning only
+  // unless `--require-attestation` was requested).
+  let exitCode = 0;
+  if (!conformanceValid) {
+    exitCode = 1;
+  } else if (options.requireAttestation && attestation.status !== "verified") {
+    exitCode = attestation.status === "unavailable" ? 2 : 1;
+  }
+
   return {
     mode,
     source: input,
     input,
-    valid: !hasFailure,
-    exitCode: hasFailure ? 1 : 0,
+    valid: exitCode === 0,
+    exitCode,
     document,
     metadata,
     checks,
     probes,
+    conformance: {
+      valid: conformanceValid,
+      errors: conformanceErrors,
+      warnings: conformanceWarnings,
+    },
+    attestation,
     fetchFailure: null,
   };
 }
@@ -1839,6 +1590,15 @@ function toJson(result: RunResult): Record<string, unknown> {
   const warnings = result.checks
     .filter((check) => check.status === "warn")
     .map((check) => `${check.id}: ${check.message}`);
+  const attestationWarnings =
+    result.attestation.status === "verified" ||
+    result.attestation.status === "unverified" ||
+    result.attestation.status === "not_checked"
+      ? [...result.attestation.warnings]
+      : [
+          ...result.attestation.errors.map((error) => `attestation: ${error}`),
+          ...result.attestation.warnings,
+        ];
   return {
     validator: VALIDATOR_ID,
     validatorVersion: VALIDATOR_VERSION,
@@ -1846,6 +1606,29 @@ function toJson(result: RunResult): Record<string, unknown> {
     source: result.source,
     valid: result.valid,
     exitCode: result.exitCode,
+    conformance: {
+      valid: result.conformance.valid,
+      errors: result.conformance.errors,
+      warnings: result.conformance.warnings,
+    },
+    attestation: {
+      present: result.attestation.present,
+      checked: result.attestation.checked,
+      required: result.attestation.required,
+      verified: result.attestation.verified,
+      status: result.attestation.status,
+      reason: result.attestation.reason,
+      iss: result.attestation.iss,
+      jti: result.attestation.jti,
+      origin: result.attestation.origin,
+      audience: result.attestation.audience,
+      level: result.attestation.level,
+      checked_at: result.attestation.checked_at,
+      jwks_source: result.attestation.jwks_source,
+      checks: result.attestation.checks,
+      errors: result.attestation.errors,
+      warnings: result.attestation.warnings,
+    },
     protocol: result.metadata?.protocol ?? null,
     audience: result.metadata?.audience ?? null,
     providerName: result.metadata?.providerName ?? null,
@@ -1875,7 +1658,7 @@ function toJson(result: RunResult): Record<string, unknown> {
       message: probe.message,
     })),
     errors,
-    warnings,
+    warnings: [...warnings, ...attestationWarnings],
   };
 }
 
@@ -1928,16 +1711,24 @@ function printHuman(result: RunResult): void {
     }
   }
 
-  const counts = summarize(result);
-  const verdict =
-    result.exitCode === 0
-      ? "VALID"
-      : result.exitCode === 2
-        ? "COULD NOT FETCH"
-        : "INVALID";
   lines.push("");
   lines.push(
-    `RESULT: ${verdict} — ${counts.failed} failure(s), ${counts.warnings} warning(s), exit ${result.exitCode}`,
+    `ATTESTATION: ${result.attestation.status}${result.attestation.reason ? ` (${result.attestation.reason})` : ""}`,
+  );
+  if (result.attestation.checks.length > 0) {
+    for (const check of result.attestation.checks) {
+      lines.push(`  [${statusLabel(check.status)}] ${check.id}  ${check.message}`);
+    }
+  }
+
+  const counts = summarize(result);
+  const documentVerdict = result.conformance.valid ? "VALID" : "INVALID";
+  const resultVerdict =
+    result.exitCode === 0 ? "OK" : result.exitCode === 2 ? "COULD NOT FETCH" : "FAILED";
+  lines.push("");
+  lines.push(`DOCUMENT: ${documentVerdict}`);
+  lines.push(
+    `RESULT: ${resultVerdict} — ${counts.failed} failure(s), ${counts.warnings} warning(s), exit ${result.exitCode}`,
   );
   console.log(lines.join("\n"));
 }
@@ -1977,7 +1768,55 @@ async function main(): Promise<void> {
   process.exitCode = result.exitCode;
 }
 
-main().catch((error: unknown) => {
-  console.error("Validator crashed:", error instanceof Error ? error.stack ?? error.message : error);
-  process.exitCode = 2;
-});
+/**
+ * Programmatic entry point used by the fixture harness (`pnpm validate:fixtures`).
+ * It is not part of the published package's `src/index.ts` surface; it exists so
+ * the manual harness exercises the same code path as the CLI without spawning a
+ * process per fixture and without inventing a test framework.
+ */
+export interface DiscoveryValidationOptions {
+  verifyAttestation?: boolean;
+  requireAttestation?: boolean;
+  trustedBrokers?: string[];
+  jwks?: string | null;
+  at?: number | null;
+  timeoutMs?: number;
+  maxBytes?: number;
+  probeJwks?: boolean;
+  probeEndpoints?: boolean;
+}
+
+export type DiscoveryRunResult = RunResult;
+
+export async function validateDiscoveryInput(
+  input: string,
+  overrides: DiscoveryValidationOptions = {},
+): Promise<RunResult> {
+  const options: ParsedOptions = {
+    input,
+    json: false,
+    help: false,
+    probeJwks: overrides.probeJwks ?? false,
+    probeEndpoints: overrides.probeEndpoints ?? false,
+    timeoutMs: overrides.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    maxBytes: overrides.maxBytes ?? DEFAULT_MAX_BYTES,
+    verifyAttestation: overrides.verifyAttestation ?? false,
+    requireAttestation: overrides.requireAttestation ?? false,
+    trustedBrokers: overrides.trustedBrokers ?? [],
+    jwks: overrides.jwks ?? null,
+    at: overrides.at ?? null,
+  };
+  const isUrl = /^https?:\/\//i.test(input);
+  return isUrl ? runUrlMode(options, input) : runFileMode(options, input);
+}
+
+const invokedDirectly =
+  process.argv[1] !== undefined &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (invokedDirectly) {
+  main().catch((error: unknown) => {
+    console.error("Validator crashed:", error instanceof Error ? error.stack ?? error.message : error);
+    process.exitCode = 2;
+  });
+}

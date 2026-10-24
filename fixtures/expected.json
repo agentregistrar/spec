@@ -1,0 +1,642 @@
+{
+  "$comment": "Expected results for the manual fixture harness (`pnpm validate:fixtures`). Regenerate JWS fixtures with `pnpm sign:fixtures`; this file is hand-maintained. A `crossFieldOnly: true` attestation row is valid under the closed JSON Schema but rejected by Zod for a cross-field rule JSON Schema cannot express (here: unique keys[].kid).",
+  "clock": "2026-10-24T00:00:00Z",
+  "defaults": {
+    "trustedBrokers": [
+      "https://rp-broker.example"
+    ],
+    "jwks": "fixtures/keys/fixture-jwks-broker-1.json",
+    "at": "2026-10-24T00:00:00Z"
+  },
+  "cases": [
+    {
+      "id": "discovery/valid-minimal",
+      "kind": "discovery",
+      "path": "fixtures/valid-minimal.json",
+      "options": {
+        "verifyAttestation": false
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "unverified",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/valid-full",
+      "kind": "discovery",
+      "path": "fixtures/valid-full.json",
+      "options": {
+        "verifyAttestation": false
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "unverified",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/valid-localhost",
+      "kind": "discovery",
+      "path": "fixtures/valid-localhost.json",
+      "options": {
+        "verifyAttestation": false
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "unverified",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/valid-attested-domain",
+      "kind": "discovery",
+      "path": "fixtures/valid-attested-domain.json",
+      "options": {
+        "verifyAttestation": true,
+        "requireAttestation": true
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "verified",
+        "level": "domain",
+        "conformance": true,
+        "verified": true
+      }
+    },
+    {
+      "id": "discovery/valid-attested-entity",
+      "kind": "discovery",
+      "path": "fixtures/valid-attested-entity.json",
+      "options": {
+        "verifyAttestation": true,
+        "requireAttestation": true
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "verified",
+        "level": "entity",
+        "conformance": true,
+        "verified": true
+      }
+    },
+    {
+      "id": "discovery/invalid-attestation-malformed",
+      "kind": "discovery",
+      "path": "fixtures/invalid-attestation-malformed.json",
+      "options": {
+        "verifyAttestation": false
+      },
+      "expect": {
+        "exitCode": 1,
+        "status": "invalid",
+        "conformance": false,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/invalid-attestation-oversize",
+      "kind": "discovery",
+      "path": "fixtures/invalid-attestation-oversize.json",
+      "options": {
+        "verifyAttestation": false
+      },
+      "expect": {
+        "exitCode": 1,
+        "status": "invalid",
+        "conformance": false,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/invalid-attestation-not-string",
+      "kind": "discovery",
+      "path": "fixtures/invalid-attestation-not-string.json",
+      "options": {
+        "verifyAttestation": false
+      },
+      "expect": {
+        "exitCode": 1,
+        "status": "invalid",
+        "conformance": false,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/valid-attestation-expired--warn",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-expired.json",
+      "options": {
+        "verifyAttestation": true,
+        "at": "2026-11-30T00:00:00Z"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "expired",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/valid-attestation-expired--require",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-expired.json",
+      "options": {
+        "verifyAttestation": true,
+        "requireAttestation": true,
+        "at": "2026-11-30T00:00:00Z"
+      },
+      "expect": {
+        "exitCode": 1,
+        "status": "expired",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/valid-attested-unavailable--warn",
+      "kind": "discovery",
+      "path": "fixtures/valid-attested-unavailable.json",
+      "options": {
+        "verifyAttestation": true,
+        "jwks": "fixtures/keys/does-not-exist.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "unavailable",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/valid-attested-unavailable--require",
+      "kind": "discovery",
+      "path": "fixtures/valid-attested-unavailable.json",
+      "options": {
+        "verifyAttestation": true,
+        "requireAttestation": true,
+        "jwks": "fixtures/keys/does-not-exist.json"
+      },
+      "expect": {
+        "exitCode": 2,
+        "status": "unavailable",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/untrusted-broker--warn",
+      "kind": "discovery",
+      "path": "fixtures/valid-attested-domain.json",
+      "options": {
+        "verifyAttestation": true,
+        "trustedBrokers": []
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "attested_untrusted_broker",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/untrusted-broker--require",
+      "kind": "discovery",
+      "path": "fixtures/valid-attested-domain.json",
+      "options": {
+        "verifyAttestation": true,
+        "requireAttestation": true,
+        "trustedBrokers": []
+      },
+      "expect": {
+        "exitCode": 1,
+        "status": "attested_untrusted_broker",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "attestations/valid-domain",
+      "kind": "attestation",
+      "jwt": "fixtures/attestations/valid-domain.jwt",
+      "documentOrigin": "https://vaporcloud.example",
+      "options": {},
+      "expect": {
+        "status": "verified",
+        "producer": true,
+        "verifier": true
+      }
+    },
+    {
+      "id": "attestations/valid-entity",
+      "kind": "attestation",
+      "jwt": "fixtures/attestations/valid-entity.jwt",
+      "documentOrigin": "https://vaporcloud.example",
+      "options": {},
+      "expect": {
+        "status": "verified",
+        "producer": true,
+        "verifier": true
+      }
+    },
+    {
+      "id": "attestations/valid-domain-rotated",
+      "kind": "attestation",
+      "jwt": "fixtures/attestations/valid-domain-rotated.jwt",
+      "documentOrigin": "https://vaporcloud.example",
+      "options": {},
+      "expect": {
+        "status": "verified",
+        "producer": true,
+        "verifier": true
+      }
+    },
+    {
+      "id": "attestations/expired",
+      "kind": "attestation",
+      "jwt": "fixtures/attestations/expired.jwt",
+      "documentOrigin": "https://vaporcloud.example",
+      "options": {
+        "at": "2026-11-30T00:00:00Z"
+      },
+      "expect": {
+        "status": "expired",
+        "producer": true,
+        "verifier": true,
+        "reason": "attestation_expired"
+      }
+    },
+    {
+      "id": "attestations/untrusted-broker",
+      "kind": "attestation",
+      "jwt": "fixtures/attestations/untrusted-broker.jwt",
+      "documentOrigin": "https://vaporcloud.example",
+      "options": {},
+      "expect": {
+        "status": "attested_untrusted_broker",
+        "producer": true,
+        "verifier": true,
+        "reason": "rp_broker_untrusted"
+      }
+    },
+    {
+      "id": "attestations/unknown-additive-claim",
+      "kind": "attestation",
+      "jwt": "fixtures/attestations/unknown-additive-claim.jwt",
+      "documentOrigin": "https://vaporcloud.example",
+      "options": {},
+      "expect": {
+        "status": "verified",
+        "producer": false,
+        "verifier": true
+      }
+    },
+    {
+      "id": "attestations/bad-signature",
+      "kind": "attestation",
+      "jwt": "fixtures/attestations/bad-signature.jwt",
+      "documentOrigin": "https://vaporcloud.example",
+      "options": {},
+      "expect": {
+        "status": "invalid",
+        "producer": true,
+        "verifier": true,
+        "reason": "bad_signature"
+      }
+    },
+    {
+      "id": "attestations/wrong-origin",
+      "kind": "attestation",
+      "jwt": "fixtures/attestations/wrong-origin.jwt",
+      "documentOrigin": "https://vaporcloud.example",
+      "options": {},
+      "expect": {
+        "status": "invalid",
+        "producer": true,
+        "verifier": true,
+        "reason": "wrong_origin"
+      }
+    },
+    {
+      "id": "attestations/wrong-audience",
+      "kind": "attestation",
+      "jwt": "fixtures/attestations/wrong-audience.jwt",
+      "documentOrigin": "https://vaporcloud.example",
+      "options": {},
+      "expect": {
+        "status": "invalid",
+        "producer": true,
+        "verifier": true,
+        "reason": "wrong_audience"
+      }
+    },
+    {
+      "id": "attestations/wrong-typ",
+      "kind": "attestation",
+      "jwt": "fixtures/attestations/wrong-typ.jwt",
+      "documentOrigin": "https://vaporcloud.example",
+      "options": {},
+      "expect": {
+        "status": "invalid",
+        "producer": true,
+        "verifier": true,
+        "reason": "wrong_typ"
+      }
+    },
+    {
+      "id": "attestations/unknown-kid",
+      "kind": "attestation",
+      "jwt": "fixtures/attestations/unknown-kid.jwt",
+      "documentOrigin": "https://vaporcloud.example",
+      "options": {},
+      "expect": {
+        "status": "invalid",
+        "producer": true,
+        "verifier": true,
+        "reason": "unknown_kid"
+      }
+    },
+    {
+      "id": "attestations/duplicate-kid",
+      "kind": "attestation",
+      "jwt": "fixtures/attestations/duplicate-kid.jwt",
+      "documentOrigin": "https://vaporcloud.example",
+      "options": {},
+      "expect": {
+        "status": "invalid",
+        "producer": false,
+        "verifier": false,
+        "reason": "claims_invalid",
+        "crossFieldOnly": true
+      }
+    },
+    {
+      "id": "attestations/missing-exp",
+      "kind": "attestation",
+      "jwt": "fixtures/attestations/missing-exp.jwt",
+      "documentOrigin": "https://vaporcloud.example",
+      "options": {},
+      "expect": {
+        "status": "invalid",
+        "producer": false,
+        "verifier": false,
+        "reason": "claims_invalid"
+      }
+    },
+    {
+      "id": "receipts/valid-receipt",
+      "kind": "receipt",
+      "jwt": "fixtures/receipts/valid-receipt.jwt",
+      "attestation": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": true,
+        "rule": null,
+        "schema": true
+      }
+    },
+    {
+      "id": "receipts/valid-receipt-legacy-exp",
+      "kind": "receipt",
+      "jwt": "fixtures/receipts/valid-receipt-legacy-exp.jwt",
+      "attestation": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": true,
+        "rule": null,
+        "schema": true
+      }
+    },
+    {
+      "id": "receipts/valid-receipt-rotated-key",
+      "kind": "receipt",
+      "jwt": "fixtures/receipts/valid-receipt-rotated-key.jwt",
+      "attestation": "fixtures/attestations/valid-domain-rotated.jwt",
+      "expect": {
+        "valid": true,
+        "rule": null,
+        "schema": true
+      }
+    },
+    {
+      "id": "receipts/invalid-receipt-bad-key",
+      "kind": "receipt",
+      "jwt": "fixtures/receipts/invalid-receipt-bad-key.jwt",
+      "attestation": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": false,
+        "rule": "key_not_in_attestation",
+        "schema": true
+      }
+    },
+    {
+      "id": "receipts/wrong-origin",
+      "kind": "receipt",
+      "jwt": "fixtures/receipts/wrong-origin.jwt",
+      "attestation": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": false,
+        "rule": "origin",
+        "schema": true
+      }
+    },
+    {
+      "id": "receipts/outside-window",
+      "kind": "receipt",
+      "jwt": "fixtures/receipts/outside-window.jwt",
+      "attestation": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": false,
+        "rule": "window",
+        "schema": true
+      }
+    },
+    {
+      "id": "receipts/missing-key-id",
+      "kind": "receipt",
+      "jwt": "fixtures/receipts/missing-key-id.jwt",
+      "attestation": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": false,
+        "rule": "missing_key_id",
+        "schema": false
+      }
+    },
+    {
+      "id": "abuse/valid-abuse-report",
+      "kind": "abuse",
+      "jwt": "fixtures/abuse/valid-abuse-report.jwt",
+      "attestation": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": true,
+        "rule": null,
+        "schema": true,
+        "verifier": true
+      }
+    },
+    {
+      "id": "abuse/invalid-abuse-expired",
+      "kind": "abuse",
+      "jwt": "fixtures/abuse/invalid-abuse-expired.jwt",
+      "attestation": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": false,
+        "rule": "expired",
+        "schema": true,
+        "verifier": true
+      }
+    },
+    {
+      "id": "abuse/wrong-aud",
+      "kind": "abuse",
+      "jwt": "fixtures/abuse/wrong-aud.jwt",
+      "attestation": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": false,
+        "rule": "audience",
+        "schema": true,
+        "verifier": true
+      }
+    },
+    {
+      "id": "abuse/unknown-additive-claim",
+      "kind": "abuse",
+      "jwt": "fixtures/abuse/unknown-additive-claim.jwt",
+      "attestation": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": true,
+        "rule": null,
+        "schema": false,
+        "verifier": true
+      }
+    },
+    {
+      "id": "status/status-active",
+      "kind": "status",
+      "jwt": "fixtures/status/status-active.jwt",
+      "expectedSubFrom": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": true,
+        "rule": null,
+        "schema": true
+      }
+    },
+    {
+      "id": "status/status-suspended",
+      "kind": "status",
+      "jwt": "fixtures/status/status-suspended.jwt",
+      "expectedSubFrom": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": true,
+        "rule": null,
+        "schema": true
+      }
+    },
+    {
+      "id": "status/status-revoked",
+      "kind": "status",
+      "jwt": "fixtures/status/status-revoked.jwt",
+      "expectedSubFrom": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": true,
+        "rule": null,
+        "schema": true
+      }
+    },
+    {
+      "id": "status/status-wrong-sub",
+      "kind": "status",
+      "jwt": "fixtures/status/status-wrong-sub.jwt",
+      "expectedSubFrom": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": false,
+        "rule": "wrong_sub",
+        "schema": true
+      }
+    },
+    {
+      "id": "status/status-bad-signature",
+      "kind": "status",
+      "jwt": "fixtures/status/status-bad-signature.jwt",
+      "expectedSubFrom": "fixtures/attestations/valid-domain.jwt",
+      "expect": {
+        "valid": false,
+        "rule": "bad_signature",
+        "schema": true
+      }
+    },
+    {
+      "id": "metadata/broker-metadata",
+      "kind": "metadata",
+      "path": "fixtures/broker-metadata.json",
+      "documentOrigin": "https://rp-broker.example",
+      "expect": {
+        "schema": true,
+        "zod": true,
+        "valid": true,
+        "issuerMatchesDocumentOrigin": true
+      }
+    },
+    {
+      "id": "metadata/http-jwks",
+      "kind": "metadata",
+      "path": "fixtures/invalid-broker-metadata-http-jwks.json",
+      "documentOrigin": "https://rp-broker.example",
+      "expect": {
+        "schema": false,
+        "zod": false,
+        "valid": false,
+        "issuerMatchesDocumentOrigin": true
+      }
+    },
+    {
+      "id": "metadata/missing-status-uri",
+      "kind": "metadata",
+      "path": "fixtures/invalid-broker-metadata-missing-status-uri.json",
+      "documentOrigin": "https://rp-broker.example",
+      "expect": {
+        "schema": false,
+        "zod": false,
+        "valid": false,
+        "issuerMatchesDocumentOrigin": true
+      }
+    },
+    {
+      "id": "metadata/wrong-issuer",
+      "kind": "metadata",
+      "path": "fixtures/invalid-broker-metadata-wrong-issuer.json",
+      "documentOrigin": "https://rp-broker.example",
+      "expect": {
+        "schema": true,
+        "zod": false,
+        "valid": false,
+        "issuerMatchesDocumentOrigin": false
+      }
+    },
+    {
+      "id": "provider/origin-challenge-https",
+      "kind": "provider",
+      "path": "fixtures/provider/origin-challenge-https.json",
+      "expect": {
+        "valid": true
+      }
+    },
+    {
+      "id": "provider/key-pop-claims",
+      "kind": "provider",
+      "path": "fixtures/provider/key-pop-claims.json",
+      "expect": {
+        "valid": true
+      }
+    },
+    {
+      "id": "provider/attestation-issuance",
+      "kind": "provider",
+      "path": "fixtures/provider/attestation-issuance.json",
+      "expect": {
+        "valid": true
+      }
+    }
+  ]
+}

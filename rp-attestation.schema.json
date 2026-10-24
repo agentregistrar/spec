@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.agentregistrar.dev/agent-identity/v1/rp-attestation.schema.json",
+  "title": "Agent Identity RP attestation claims (agent-rp-attestation+jwt)",
+  "description": "Contract G claims for the Broker-B-signed RP attestation published in the optional `rp_attestation` discovery field. PRODUCER MODE: every object is closed (`additionalProperties: false`); a v1.2 producer MUST NOT emit unknown fields. A verifier MUST validate every known field and ignore unknown additive fields it does not understand; the verifier gate is `parseRpAttestationVerifier` in `@agentregistrar/discovery`, not this closed schema. The JWS header is {alg: EdDSA, typ: agent-rp-attestation+jwt, kid}. Cross-field rules JSON Schema cannot express (exp-iat = 86400, rp.id = sub, legal_name at `entity`, entity_reviewed_at null at `domain`, unique keys[].kid) are normative in agent-identity-v1.md and enforced by Zod and the validator. Normative definition: agent-identity-v1.md §14.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["iss", "sub", "aud", "jti", "iat", "exp", "rp", "keys"],
+  "properties": {
+    "iss": {
+      "description": "Broker B issuer origin: lowercase, no path, query, or fragment. MUST equal the `issuer` of its broker metadata.",
+      "$ref": "#/$defs/origin"
+    },
+    "sub": {
+      "description": "Provider UUID. MUST equal `rp.id`.",
+      "$ref": "#/$defs/uuid"
+    },
+    "aud": {
+      "description": "Protocol label, never the human broker issuer.",
+      "const": "agent-identity-v1"
+    },
+    "jti": {
+      "description": "Attestation id: `rpa_` + 26-character lowercase Crockford base32 ULID (no i/l/o/u). Unique per issuance.",
+      "type": "string",
+      "pattern": "^rpa_[0-9a-hjkmnp-tv-z]{26}$"
+    },
+    "iat": {
+      "description": "Issued-at, integer seconds.",
+      "type": "integer"
+    },
+    "exp": {
+      "description": "Expiry, integer seconds. exp - iat MUST equal exactly 86400.",
+      "type": "integer"
+    },
+    "rp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "origin", "audience", "name", "contact", "verification"],
+      "properties": {
+        "id": {
+          "description": "Provider UUID. MUST equal `sub`.",
+          "$ref": "#/$defs/uuid"
+        },
+        "origin": {
+          "description": "Canonical origin of the discovery document that carries this attestation. MUST equal the fetched document origin, never provider_url or terms.url.",
+          "$ref": "#/$defs/origin"
+        },
+        "audience": {
+          "description": "Exactly `discovery.audience`.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^\\S+$"
+        },
+        "name": {
+          "description": "Human-readable provider name (provider_origins.provider_name).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "legal_name": {
+          "description": "Legal entity name. OPTIONAL at `domain`, REQUIRED at `entity`.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "contact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["email"],
+          "properties": {
+            "email": {
+              "description": "Single email address.",
+              "$ref": "#/$defs/email"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        },
+        "verification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["level", "method", "origin_verified_at", "entity_reviewed_at"],
+          "properties": {
+            "level": {
+              "description": "Assurance level. No `enhanced` in v1.2; neither level asserts safety.",
+              "enum": ["domain", "entity"]
+            },
+            "method": {
+              "description": "The method that verified control of the origin.",
+              "enum": ["https", "dns"]
+            },
+            "origin_verified_at": {
+              "$ref": "#/$defs/dateTime"
+            },
+            "entity_reviewed_at": {
+              "description": "null at `domain`; non-null at `entity`. Records when the operator reviewed the entity; no ordering requirement against origin_verified_at.",
+              "type": ["string", "null"],
+              "format": "date-time"
+            }
+          }
+        }
+      }
+    },
+    "keys": {
+      "description": "Every active key plus every retiring key whose retire_after is in the future (1-8 entries, unique kid). Public material only.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/key"
+      }
+    }
+  },
+  "$defs": {
+    "origin": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^https://[a-z0-9][a-z0-9.-]*(?::[0-9]+)?$"
+    },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "email": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    },
+    "dateTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kid", "kty", "crv", "x", "alg", "purposes"],
+      "properties": {
+        "kid": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{1,64}$"
+        },
+        "kty": {
+          "const": "OKP"
+        },
+        "crv": {
+          "const": "Ed25519"
+        },
+        "x": {
+          "description": "base64url-encoded 32-byte Ed25519 public key.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "alg": {
+          "const": "EdDSA"
+        },
+        "purposes": {
+          "description": "Exactly [\"receipt\",\"abuse\"] in v1.2. The array is retained so a future split is additive; a v1.2 producer MUST NOT emit a subset.",
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "enum": ["receipt", "abuse"]
+          }
+        }
+      }
+    }
+  }
+}

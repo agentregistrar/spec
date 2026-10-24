@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.agentregistrar.dev/agent-identity/v1/registry-implementations.schema.json",
+  "title": "agent-identity-v1 implementation registry",
+  "description": "Validates registry/implementations.json. This is a registry artifact, not a second public protocol surface: it describes adoption (which discovery documents pass the conformance validator and, optionally, which providers a broker has verified). Conformance and verification are separate. The optional `verification` object is a snapshot taken at `checked_at`; absence means conformant and unverified. A verified badge renders only when `status` is `active` at `checked_at`, so a later suspension or revocation does not rewrite the static entry until a new check is recorded. Normative definition: registry/README.md and agent-identity-v1.md §19.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "registry",
+    "protocol",
+    "spec",
+    "registry_criteria",
+    "updated_at",
+    "implementations"
+  ],
+  "properties": {
+    "registry": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "protocol": {
+      "const": "agent-identity-v1"
+    },
+    "spec": {
+      "type": "string",
+      "minLength": 1
+    },
+    "registry_criteria": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "capability_vocabulary": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/capability"
+      }
+    },
+    "capability_vocabulary_note": {
+      "type": "string"
+    },
+    "validator": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "version", "script", "run"],
+      "properties": {
+        "id": {
+          "const": "agent-identity-v1"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "script": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "implementations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/implementation"
+      }
+    }
+  },
+  "$defs": {
+    "capability": {
+      "enum": ["agent_signup", "post_signup_context"]
+    },
+    "origin": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^https://[a-z0-9][a-z0-9.-]*(?::[0-9]+)?$"
+    },
+    "httpsUrl": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^https://[^\\s]+$"
+    },
+    "contact": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:[^@\\s]+@[^@\\s]+\\.[^@\\s]+|https://[^\\s]+)$"
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "implementation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "name",
+        "url",
+        "discovery_url",
+        "audience",
+        "protocol",
+        "capabilities",
+        "contact",
+        "validated_at",
+        "validator_version",
+        "validator_evidence"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "$ref": "#/$defs/httpsUrl"
+        },
+        "discovery_url": {
+          "$ref": "#/$defs/httpsUrl"
+        },
+        "discovery_url_note": {
+          "type": "string"
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^\\S+$"
+        },
+        "protocol": {
+          "const": "agent-identity-v1"
+        },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/capability"
+          }
+        },
+        "contact": {
+          "$ref": "#/$defs/contact"
+        },
+        "post_signup_guide": {
+          "$ref": "#/$defs/httpsUrl"
+        },
+        "validated_at": {
+          "$ref": "#/$defs/date"
+        },
+        "validator_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validator_evidence": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["command", "exit_code", "valid"],
+          "properties": {
+            "command": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mode": {
+              "enum": ["file", "url"]
+            },
+            "source": {
+              "type": "string",
+              "minLength": 1
+            },
+            "exit_code": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "valid": {
+              "type": "boolean"
+            },
+            "note": {
+              "type": "string"
+            },
+            "counts": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": ["passed", "failed", "warnings", "probes"],
+              "properties": {
+                "passed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "failed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "warnings": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "probes": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "observed": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "verification": {
+          "description": "OPTIONAL snapshot of the provider's live attestation at `checked_at`. All five fields are required when present. Absence means conformant, unverified.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["broker", "level", "attestation_jti", "checked_at", "status"],
+          "properties": {
+            "broker": {
+              "$ref": "#/$defs/origin"
+            },
+            "level": {
+              "enum": ["domain", "entity"]
+            },
+            "attestation_jti": {
+              "type": "string",
+              "pattern": "^rpa_[0-9a-hjkmnp-tv-z]{26}$"
+            },
+            "checked_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "status": {
+              "enum": ["active", "suspended", "revoked"]
+            }
+          }
+        }
+      }
+    }
+  }
+}

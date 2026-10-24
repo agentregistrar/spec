@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.agentregistrar.dev/agent-identity/v1/signup-receipt.schema.json",
+  "title": "Agent Identity signup receipt claims (agent-signup-receipt+jwt)",
+  "description": "Contract E (v1.2) claims. The receipt typ stays `agent-signup-receipt+jwt`; v1.2 changes the claims, not the typ. Signed by the RP key named in `service.key_id`, which MUST be present in the attestation named by `service.attestation_jti` with `receipt` in its purposes. No `exp`: a receipt is a historical fact, valid when `iat` and `signed_up_at` both fall inside the attestation's [iat, exp] window, even when ingested later. A legacy `exp`, if present, is ignored. Header `kid` MUST equal `service.key_id`. Cross-field rules (key membership, window, origin equality, header kid) are normative in agent-identity-v1.md §11 and enforced by Contract F.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "iss",
+    "aud",
+    "sub",
+    "jti",
+    "iat",
+    "signed_up_at",
+    "assertion_jti",
+    "service",
+    "agent",
+    "human",
+    "tos"
+  ],
+  "properties": {
+    "iss": {
+      "description": "RP origin. MUST equal `service.origin` and the attestation `rp.origin`.",
+      "$ref": "#/$defs/origin"
+    },
+    "aud": {
+      "description": "Human broker issuer.",
+      "$ref": "#/$defs/origin"
+    },
+    "sub": {
+      "description": "Agent id. MUST equal the acceptance agent id.",
+      "type": "string",
+      "pattern": "^agt_[A-Za-z0-9_-]{1,64}$"
+    },
+    "jti": {
+      "description": "Receipt id: `srp_` + 26-character lowercase Crockford base32 ULID. Unique forever.",
+      "type": "string",
+      "pattern": "^srp_[0-9a-hjkmnp-tv-z]{26}$"
+    },
+    "iat": {
+      "description": "Receipt signing time (integer seconds). MUST fall inside the attestation [iat, exp] window.",
+      "type": "integer"
+    },
+    "signed_up_at": {
+      "description": "When the signup happened (integer seconds). MUST fall inside the attestation [iat, exp] window.",
+      "type": "integer"
+    },
+    "exp": {
+      "description": "DEPRECATED. A legacy expiry is ignored and never causes rejection. v1.2 producers MUST NOT emit it.",
+      "type": "integer"
+    },
+    "assertion_jti": {
+      "description": "The `jti` of the assertion presented at signup.",
+      "type": "string",
+      "minLength": 1
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "audience",
+        "origin",
+        "provider_name",
+        "account_id",
+        "attestation_jti",
+        "key_id"
+      ],
+      "properties": {
+        "audience": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^\\S+$"
+        },
+        "origin": {
+          "description": "MUST equal `iss` and the attestation `rp.origin`.",
+          "$ref": "#/$defs/origin"
+        },
+        "provider_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "provider_url": {
+          "description": "OPTIONAL display/context hint. Not an identity binding.",
+          "$ref": "#/$defs/absoluteUrl"
+        },
+        "account_id": {
+          "description": "Opaque vendor account reference; not a resource inventory.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "attestation_jti": {
+          "description": "The attestation that contained `key_id` at signing time. Contract F verifies this exact attestation in historical mode.",
+          "type": "string",
+          "pattern": "^rpa_[0-9a-hjkmnp-tv-z]{26}$"
+        },
+        "key_id": {
+          "description": "The RP key that signed this receipt. MUST be in the attestation `keys[]` with `receipt` in purposes; MUST equal the JWS header `kid`.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{1,64}$"
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "email"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^agt_[A-Za-z0-9_-]{1,64}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "email": {
+          "$ref": "#/$defs/email"
+        }
+      }
+    },
+    "human": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "email", "verified"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "email": {
+          "$ref": "#/$defs/email"
+        },
+        "verified": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tos": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "url", "sha256"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "$ref": "#/$defs/absoluteUrl"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "master_tos_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "context": {
+      "description": "Optional post-signup context guide pointer (spec §11). Not part of the attestation.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "sha256"],
+      "properties": {
+        "url": {
+          "$ref": "#/$defs/absoluteUrl"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "origin": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^https://[a-z0-9][a-z0-9.-]*(?::[0-9]+)?$"
+    },
+    "absoluteUrl": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^https://[^\\s]+$"
+    },
+    "email": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    }
+  }
+}

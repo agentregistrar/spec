@@ -1,0 +1,14 @@
+{
+  "issuer": "https://other-broker.example",
+  "comment": "TEST VECTOR ONLY — public JWKS for the untrusted-broker fixture; never a production broker.",
+  "keys": [
+    {
+      "kid": "broker-2-key-2026-10",
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "x": "nduemB8jhWKMdR3jBS3TvCSNeAWCn7eR2mFBKD64nro",
+      "alg": "EdDSA",
+      "use": "sig"
+    }
+  ]
+}

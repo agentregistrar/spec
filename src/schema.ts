@@ -26,6 +26,24 @@ import { createHash } from "node:crypto";
 
 import { z } from "zod";
 
+import {
+  ABUSE_JTI_PATTERN,
+  ABUSE_REPORT_LIFETIME_SECONDS,
+  ATTESTATION_FIELD_MAX_LENGTH,
+  ATTESTATION_JTI_PATTERN,
+  ATTESTATION_LIFETIME_SECONDS,
+  ATTESTATION_STATUS_LIFETIME_SECONDS,
+  COMPACT_JWS_PATTERN,
+  ED25519_PUBLIC_KEY_PATTERN,
+  KEY_ID_PATTERN,
+  MAX_ATTESTATION_KEYS,
+  PROTOCOL_AUDIENCE,
+  PROTOCOL_VERSION,
+  RECEIPT_JTI_PATTERN,
+  UUID_PATTERN,
+} from "./constants";
+import { isCanonicalOrigin } from "./http";
+
 /**
  * Computes the canonical `sha256:<64 lowercase hex>` content hash used to
  * reference immutable content (the relying party terms text, the Master ToS,
@@ -178,6 +196,20 @@ export const AgentSignupDiscoverySchema = z
     audience,
     provider_name: z.string().min(1),
 
+    // Contract G carrier (spec §5.3): an OPTIONAL compact JWS. Presence changes
+    // no other field; absence is conformant and means "unverified".
+    rp_attestation: z
+      .string()
+      .max(
+        ATTESTATION_FIELD_MAX_LENGTH,
+        `rp_attestation must be at most ${ATTESTATION_FIELD_MAX_LENGTH} characters`,
+      )
+      .regex(
+        COMPACT_JWS_PATTERN,
+        "rp_attestation must be a compact JWS: three base64url segments separated by `.`",
+      )
+      .optional(),
+
     // Optional identity metadata.
     spec: absoluteProtocolUrl.optional(),
     provider_url: absoluteProtocolUrl.optional(),
@@ -244,3 +276,307 @@ export const AgentSignupDiscoverySchema = z
   .passthrough();
 
 export type AgentSignupDiscovery = z.infer<typeof AgentSignupDiscoverySchema>;
+
+// ===========================================================================
+// Contract G — RP attestation (`agent-rp-attestation+jwt`)
+// ===========================================================================
+//
+// Two modes are frozen (spec §5.12, ledger §3.12):
+//
+// - **Producer mode** (`RpAttestationClaimsSchema`) is closed at every object
+//   level. A v1.2 producer MUST NOT emit unknown fields.
+// - **Verifier mode** validates every known field and ignores unknown additive
+//   fields, so a future additive minor revision does not break an older
+//   verifier. Ignoring an unknown field is not permission to skip a known check.
+//
+// The published JSON Schema (`rp-attestation.schema.json`) is producer mode; the
+// named parser `parseRpAttestationVerifier` is the verifier gate.
+
+/** `domain` or `entity` (spec §5.10). No `enhanced` in v1.2. */
+export const AssuranceLevelSchema = z.enum(["domain", "entity"]);
+export type AssuranceLevel = z.infer<typeof AssuranceLevelSchema>;
+
+/** Attestation status values from Contract I (spec §5.5). */
+export const AttestationStatusValueSchema = z.enum(["active", "suspended", "revoked"]);
+export type AttestationStatusValue = z.infer<typeof AttestationStatusValueSchema>;
+
+/** The JWS header of a Contract G attestation. */
+export const RpAttestationHeaderSchema = z
+  .object({
+    alg: z.literal("EdDSA"),
+    typ: z.literal("agent-rp-attestation+jwt"),
+    kid: z
+      .string()
+      .regex(KEY_ID_PATTERN, "kid must be 1-64 characters of [A-Za-z0-9._-]"),
+  })
+  .strict();
+export type RpAttestationHeader = z.infer<typeof RpAttestationHeaderSchema>;
+
+/** One public RP signing key carried in the attestation. */
+export const RpAttestationKeySchema = z
+  .object({
+    kid: z
+      .string()
+      .regex(KEY_ID_PATTERN, "kid must be 1-64 characters of [A-Za-z0-9._-]"),
+    kty: z.literal("OKP"),
+    crv: z.literal("Ed25519"),
+    x: z
+      .string()
+      .regex(ED25519_PUBLIC_KEY_PATTERN, "x must be a base64url 32-byte Ed25519 public key"),
+    alg: z.literal("EdDSA"),
+    purposes: z.tuple([z.literal("receipt"), z.literal("abuse")]),
+  })
+  .strict();
+export type RpAttestationKey = z.infer<typeof RpAttestationKeySchema>;
+
+/** `true` when the value is a canonical origin (lowercase, no path/query/fragment). */
+function canonicalOriginString(message: string) {
+  return z.string().min(1).refine(isCanonicalOrigin, { message });
+}
+
+const emailAddress = z
+  .string()
+  .min(1)
+  .refine((value) => EMAIL_PATTERN.test(value), { message: "must be a single email address" });
+
+const utcTimestamp = z
+  .string()
+  .datetime({ offset: true, message: "must be a valid RFC 3339 date-time" });
+
+type SchemaMode = "producer" | "verifier";
+
+function objectForMode<T extends z.ZodRawShape>(shape: T, mode: SchemaMode) {
+  const object = z.object(shape);
+  return mode === "producer" ? object.strict() : object.passthrough();
+}
+
+function buildRpAttestationClaimsSchema(mode: SchemaMode) {
+  const object = <T extends z.ZodRawShape>(shape: T) => objectForMode(shape, mode);
+
+  const contact = object({
+    email: emailAddress,
+    name: z.string().min(1).max(128).optional(),
+  });
+
+  const verification = object({
+    level: AssuranceLevelSchema,
+    method: z.enum(["https", "dns"]),
+    origin_verified_at: utcTimestamp,
+    entity_reviewed_at: utcTimestamp.nullable(),
+  });
+
+  const rp = object({
+    id: z.string().regex(UUID_PATTERN, "rp.id must be the provider UUID"),
+    origin: canonicalOriginString(
+      "rp.origin must be a canonical origin (lowercase, no path, query, fragment, or trailing slash)",
+    ),
+    audience: z
+      .string()
+      .min(1)
+      .max(256)
+      .regex(/^\S+$/, "rp.audience must be a non-empty, whitespace-free service identifier"),
+    name: z.string().min(1).max(128),
+    legal_name: z.string().min(1).max(256).optional(),
+    contact,
+    verification,
+  });
+
+  return object({
+    iss: canonicalOriginString(
+      "iss must be the broker issuer origin (lowercase, no path, query, fragment, or trailing slash)",
+    ),
+    sub: z.string().regex(UUID_PATTERN, "sub must be the provider UUID"),
+    aud: z.literal(PROTOCOL_AUDIENCE),
+    jti: z.string().regex(ATTESTATION_JTI_PATTERN, "jti must be `rpa_` + 26-character lowercase Crockford base32"),
+    iat: z.number().int(),
+    exp: z.number().int(),
+    rp,
+    keys: z
+      .array(RpAttestationKeySchema)
+      .min(1)
+      .max(MAX_ATTESTATION_KEYS, `keys must contain at most ${MAX_ATTESTATION_KEYS} entries`),
+  }).superRefine((value, ctx) => {
+    // Cross-field rules JSON Schema cannot express (spec §5.2, §5.12).
+    if (value.exp - value.iat !== ATTESTATION_LIFETIME_SECONDS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["exp"],
+        message: `exp - iat must equal exactly ${ATTESTATION_LIFETIME_SECONDS} seconds`,
+      });
+    }
+    if (value.rp.id !== value.sub) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["rp", "id"],
+        message: "rp.id must equal sub (the provider UUID)",
+      });
+    }
+    const kids = value.keys.map((key) => key.kid);
+    if (new Set(kids).size !== kids.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["keys"],
+        message: "keys[].kid must be unique within one attestation",
+      });
+    }
+    if (value.rp.verification.level === "domain") {
+      if (value.rp.verification.entity_reviewed_at !== null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["rp", "verification", "entity_reviewed_at"],
+          message: "entity_reviewed_at must be null at `domain` level",
+        });
+      }
+    } else {
+      if (value.rp.verification.entity_reviewed_at === null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["rp", "verification", "entity_reviewed_at"],
+          message: "entity_reviewed_at is required at `entity` level",
+        });
+      }
+      if (value.rp.legal_name === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["rp", "legal_name"],
+          message: "legal_name is required at `entity` level",
+        });
+      }
+    }
+  });
+}
+
+/** Producer mode: closed, for v1.2 producers and document conformance. */
+export const RpAttestationClaimsSchema = buildRpAttestationClaimsSchema("producer");
+export type RpAttestationClaims = z.infer<typeof RpAttestationClaimsSchema>;
+
+/** Verifier mode: validates known fields, ignores unknown additive fields. */
+export const RpAttestationClaimsVerifierSchema = buildRpAttestationClaimsSchema("verifier");
+
+/**
+ * Strict producer parser. Throws `ZodError` when the claims are not exactly a
+ * v1.2 producer document (unknown fields are rejected).
+ */
+export function parseRpAttestationProducer(value: unknown): RpAttestationClaims {
+  return RpAttestationClaimsSchema.parse(value);
+}
+
+/**
+ * Tolerant verifier parser. Validates every known field, ignores unknown
+ * additive fields, and throws `ZodError` only on a known-field violation.
+ */
+export function parseRpAttestationVerifier(value: unknown): RpAttestationClaims {
+  return RpAttestationClaimsVerifierSchema.parse(value);
+}
+
+// ===========================================================================
+// Contract I — broker metadata and attestation status
+// ===========================================================================
+
+const absoluteHttpsUrl = z.string().min(1).refine((value) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.username === "" && url.password === "";
+  } catch {
+    return false;
+  }
+}, { message: "must be an absolute HTTPS URL" });
+
+const metadataContact = z.string().min(1).refine(
+  (value) => EMAIL_PATTERN.test(value) || absoluteHttpsUrl.safeParse(value).success,
+  { message: "contact must be an email address or an absolute HTTPS URL" },
+);
+
+/**
+ * `GET /.well-known/agent-broker.json` (spec §5.4). All six fields are REQUIRED.
+ * `jwks_uri` must be same-origin with `issuer`; a cross-origin value invalidates
+ * the document.
+ */
+export const BrokerMetadataSchema = z
+  .object({
+    issuer: canonicalOriginString("issuer must be the canonical origin of the document itself"),
+    jwks_uri: absoluteHttpsUrl,
+    attestation_status_uri: absoluteHttpsUrl,
+    abuse_endpoint: absoluteHttpsUrl,
+    protocol_versions: z
+      .array(z.string().min(1))
+      .min(1)
+      .refine((values) => new Set(values).size === values.length, "entries must be unique")
+      .refine(
+        (values) => values.includes(PROTOCOL_VERSION),
+        `must contain "${PROTOCOL_VERSION}"`,
+      ),
+    contact: metadataContact,
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    let jwksOrigin: string | null = null;
+    try {
+      jwksOrigin = new URL(value.jwks_uri).origin;
+    } catch {
+      jwksOrigin = null;
+    }
+    if (jwksOrigin !== value.issuer) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["jwks_uri"],
+        message: "jwks_uri must be on the same origin as issuer",
+      });
+    }
+  });
+export type BrokerMetadata = z.infer<typeof BrokerMetadataSchema>;
+
+/**
+ * Contract I status JWS claims (spec §5.5). `sub` is the queried attestation
+ * `jti`; `exp - iat` is exactly 300 seconds; `status_changed_at <= iat`.
+ */
+export const AttestationStatusClaimsSchema = z
+  .object({
+    iss: canonicalOriginString("iss must be the broker issuer origin"),
+    aud: z.literal(PROTOCOL_AUDIENCE),
+    jti: z.string().regex(UUID_PATTERN, "jti must be a UUIDv4"),
+    sub: z
+      .string()
+      .regex(ATTESTATION_JTI_PATTERN, "sub must be the queried attestation jti (`rpa_` + 26)"),
+    iat: z.number().int(),
+    exp: z.number().int(),
+    status: AttestationStatusValueSchema,
+    status_changed_at: utcTimestamp,
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.exp - value.iat !== ATTESTATION_STATUS_LIFETIME_SECONDS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["exp"],
+        message: `exp - iat must equal exactly ${ATTESTATION_STATUS_LIFETIME_SECONDS} seconds`,
+      });
+    }
+    const changedAt = Date.parse(value.status_changed_at);
+    if (Number.isFinite(changedAt) && changedAt > value.iat * 1000) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["status_changed_at"],
+        message: "status_changed_at must not be after iat",
+      });
+    }
+  });
+export type AttestationStatusClaims = z.infer<typeof AttestationStatusClaimsSchema>;
+
+/**
+ * The status endpoint response body (spec §5.5). `attestation_jti` is advisory:
+ * clients MUST verify the JWS and use its `sub`.
+ */
+export const AttestationStatusResponseSchema = z
+  .object({
+    attestation_jti: z.string().regex(ATTESTATION_JTI_PATTERN),
+    status_jwt: z.string().max(ATTESTATION_FIELD_MAX_LENGTH).regex(COMPACT_JWS_PATTERN),
+  })
+  .strict();
+export type AttestationStatusResponse = z.infer<typeof AttestationStatusResponseSchema>;
+
+// Patterns re-exported for callers that mirror the receipt/abuse rules in this
+// package's fixtures without importing the private monorepo Zod schemas.
+export const ReceiptJtiPattern = RECEIPT_JTI_PATTERN;
+export const AbuseJtiPattern = ABUSE_JTI_PATTERN;
+export const AbuseReportLifetimeSeconds = ABUSE_REPORT_LIFETIME_SECONDS;

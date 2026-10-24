@@ -1,0 +1,11 @@
+{
+  "jti": "rpa_01j8z9x4m2n7p5q3r6s8t0vwxy",
+  "origin": "https://vaporcloud.example",
+  "audience": "vaporcloud",
+  "verification_level": "domain",
+  "issued_at": "2026-10-24T00:00:00.000Z",
+  "expires_at": "2026-10-25T00:00:00.000Z",
+  "renewed_from_jti": null,
+  "attestation": "eyJhbGciOiJFZERTQSIsInR5cCI6ImFnZW50LXJwLWF0dGVzdGF0aW9uK2p3dCIsImtpZCI6ImJyb2tlci0xLWtleS0yMDI2LTEwIn0.e30.c2ln",
+  "__fixture_note": "Provider response example (Contract H §15): attestation issuance body. renewed_from_jti is null on a first issuance."
+}

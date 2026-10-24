@@ -1,0 +1,31 @@
+{
+  "comment": "TEST VECTOR ONLY. These are hardcoded Ed25519 private seeds used to regenerate the checked-in JWS fixtures. They are not credentials, are never referenced by broker or provider configuration, sign nothing outside fixtures/, and MUST NOT be used for any real origin. This plain `comment` is a warning, not a JWK `use`/`key_ops` value. Regenerate with `pnpm sign:fixtures`.",
+  "algorithm": "Ed25519",
+  "keys": {
+    "broker-1": {
+      "kid": "broker-1-key-2026-10",
+      "d": "yrjJa9e4hIG1AT8maKKoF3-ZMn4IAyTBn6eEE7PJ74o",
+      "x": "hQ5CXXlLHywmWHmTxTYZSf2As7VAGSiSjpkAXbaf-xw"
+    },
+    "broker-2": {
+      "kid": "broker-2-key-2026-10",
+      "d": "YDx5e74Te9Er4NBgTWGf1qYEX8F4MZL3RfXgDQxi-4Q",
+      "x": "nduemB8jhWKMdR3jBS3TvCSNeAWCn7eR2mFBKD64nro"
+    },
+    "rp-key-1": {
+      "kid": "rp-key-1",
+      "d": "SBvaoVuaz2NzLvBGIv-v-vEjx5oDSbqc5jGPD9oJWyw",
+      "x": "oy3cr_VrDItyf3P-eMfZccUds3VAFKpQ6GcSiycG61Q"
+    },
+    "rp-key-2": {
+      "kid": "rp-key-2",
+      "d": "zw5VYVG-YmH5uIz00FI1lbcQGpKIPca73tOuIdjo174",
+      "x": "fsTQA6s_qP-HxKSScKcGzTRexaDi_XyxsdDgtW8CJ3w"
+    },
+    "rogue-key": {
+      "kid": "rp-key-rogue",
+      "d": "6sCbmax2BxQzFYsmS1beNIGJDrCn3-OBMn94HMK76ok",
+      "x": "i1K6Y3U9wIvNFOmx_hegLEahwIZb9bRqJKyG_EEuVlk"
+    }
+  }
+}

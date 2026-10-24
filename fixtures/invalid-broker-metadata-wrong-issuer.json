@@ -1,0 +1,10 @@
+{
+  "issuer": "https://other-broker.example",
+  "jwks_uri": "https://rp-broker.example/.well-known/jwks.json",
+  "attestation_status_uri": "https://rp-broker.example/api/broker/attestation-status",
+  "abuse_endpoint": "https://rp-broker.example/api/broker/report-abuse",
+  "protocol_versions": [
+    "agent-identity-v1"
+  ],
+  "contact": "security@rp-broker.example"
+}

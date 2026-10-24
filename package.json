@@ -1,7 +1,7 @@
 {
   "name": "@agentregistrar/discovery",
-  "version": "1.1.0",
-  "description": "Agent Identity v1 (agent-identity-v1) discovery schema and conformance validator",
+  "version": "1.2.0",
+  "description": "Agent Identity v1 (agent-identity-v1) discovery, RP attestation, broker metadata and attestation-status schemas, plus the conformance and attestation validator",
   "license": "Apache-2.0",
   "private": false,
   "type": "module",
@@ -10,11 +10,24 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
-    }
+    },
+    "./agent-signup.schema.json": "./agent-signup.schema.json",
+    "./rp-attestation.schema.json": "./rp-attestation.schema.json",
+    "./broker-metadata.schema.json": "./broker-metadata.schema.json",
+    "./attestation-status.schema.json": "./attestation-status.schema.json",
+    "./signup-receipt.schema.json": "./signup-receipt.schema.json",
+    "./abuse-report.schema.json": "./abuse-report.schema.json",
+    "./registry/implementations.schema.json": "./registry/implementations.schema.json"
   },
   "files": [
     "src",
-    "agent-signup.schema.json"
+    "agent-signup.schema.json",
+    "rp-attestation.schema.json",
+    "broker-metadata.schema.json",
+    "attestation-status.schema.json",
+    "signup-receipt.schema.json",
+    "abuse-report.schema.json",
+    "registry/implementations.schema.json"
   ],
   "repository": {
     "type": "git",
@@ -25,13 +38,18 @@
     "agentregistrar",
     "discovery",
     "agent-signup",
-    "conformance"
+    "conformance",
+    "attestation",
+    "relying-party"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "validate:discovery": "tsx src/validate-discovery.ts",
+    "validate:fixtures": "tsx src/validate-fixtures.ts",
+    "validate:registry": "tsx src/validate-registry.ts",
+    "sign:fixtures": "tsx src/dev/sign-fixtures.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
