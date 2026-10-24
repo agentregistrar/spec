@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.agentregistrar.dev/agent-identity/v1/attestation-status.schema.json",
+  "title": "Agent Identity attestation status claims (agent-rp-attestation-status+jwt)",
+  "description": "Contract I status JWS claims returned by the broker's `attestation_status_uri` (agent-identity-v1.md §16). Header: {alg: EdDSA, typ: agent-rp-attestation-status+jwt, kid}. `sub` is the queried attestation `jti`; `exp - iat` MUST equal exactly 300 seconds; `status_changed_at` MUST NOT be after `iat` (cross-field rules enforced by Zod and the validator). The endpoint's plaintext `attestation_jti` field is advisory: clients MUST verify this JWS and use `sub`. Caching is bounded to 300 seconds.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["iss", "aud", "jti", "sub", "iat", "exp", "status", "status_changed_at"],
+  "properties": {
+    "iss": {
+      "description": "Broker issuer origin. MUST equal the metadata `issuer`.",
+      "$ref": "#/$defs/origin"
+    },
+    "aud": {
+      "const": "agent-identity-v1"
+    },
+    "jti": {
+      "description": "Unique status-response id (UUIDv4). Not the attestation id.",
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "sub": {
+      "description": "The queried attestation `jti`. Clients MUST check it equals the `attestation_jti` they asked about.",
+      "type": "string",
+      "pattern": "^rpa_[0-9a-hjkmnp-tv-z]{26}$"
+    },
+    "iat": {
+      "type": "integer"
+    },
+    "exp": {
+      "description": "exp - iat MUST equal exactly 300.",
+      "type": "integer"
+    },
+    "status": {
+      "enum": ["active", "suspended", "revoked"]
+    },
+    "status_changed_at": {
+      "description": "RFC 3339 UTC. MUST NOT be after `iat`.",
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "$defs": {
+    "origin": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^https://[a-z0-9][a-z0-9.-]*(?::[0-9]+)?$"
+    }
+  }
+}

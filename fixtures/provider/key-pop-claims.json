@@ -1,0 +1,20 @@
+{
+  "iss": "https://vaporcloud.example",
+  "aud": "https://rp-broker.example",
+  "sub": "0f3d2c1b-4a59-4e6f-8a7b-2c1d0e9f8a7b",
+  "jti": "3f6b1c2d-4e5a-4b7c-8d9e-0a1b2c3d4e5f",
+  "iat": 1792800000,
+  "exp": 1792800600,
+  "nonce": "pop_challenge_01j8z9x4m2n7p5q3r6s8t0",
+  "jwk": {
+    "kty": "OKP",
+    "crv": "Ed25519",
+    "x": "oy3cr_VrDItyf3P-eMfZccUds3VAFKpQ6GcSiycG61Q",
+    "kid": "rp-key-1"
+  },
+  "purposes": [
+    "receipt",
+    "abuse"
+  ],
+  "__fixture_note": "Provider request example (Contract H §15): key proof-of-possession claims. exp - iat = 600, aud = Broker B issuer, jwk = public_jwk."
+}

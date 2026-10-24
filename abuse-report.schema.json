@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.agentregistrar.dev/agent-identity/v1/abuse-report.schema.json",
+  "title": "Agent Identity RP abuse report claims (agent-rp-abuse+jwt)",
+  "description": "Contract D.2 (v1.2) authenticated abuse report claims. Header: {alg: EdDSA, typ: agent-rp-abuse+jwt, kid}. Signed by an RP key that is present in the accompanying attestation `keys[]` with `abuse` in purposes. `exp - iat` MUST equal exactly 300 seconds and the broker accepts the report only within [iat - 60s, exp]; the five-minute freshness bound is never extended. Reports are current events (unlike receipts, which are historical facts) and are idempotent on `jti`. Normative definition: agent-identity-v1.md §11.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["iss", "aud", "jti", "iat", "exp", "agent_id", "reason"],
+  "properties": {
+    "iss": {
+      "description": "RP origin. MUST equal the accompanying attestation `rp.origin`.",
+      "$ref": "#/$defs/origin"
+    },
+    "aud": {
+      "description": "The human broker issuer (A).",
+      "$ref": "#/$defs/origin"
+    },
+    "jti": {
+      "description": "Report id: `abr_` + 26-character lowercase Crockford base32 ULID. Idempotency key.",
+      "type": "string",
+      "pattern": "^abr_[0-9a-hjkmnp-tv-z]{26}$"
+    },
+    "iat": {
+      "type": "integer"
+    },
+    "exp": {
+      "description": "exp - iat MUST equal exactly 300.",
+      "type": "integer"
+    },
+    "agent_id": {
+      "description": "The agent being reported.",
+      "type": "string",
+      "pattern": "^agt_[A-Za-z0-9_-]{1,64}$"
+    },
+    "reason": {
+      "description": "Free-text reason, 1-500 characters. Never includes secrets or credentials.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "evidence": {
+      "description": "OPTIONAL pointers to the signup the report is about.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "assertion_jti": {
+          "type": "string",
+          "pattern": "^jti_[A-Za-z0-9_-]{1,64}$"
+        },
+        "signup_token_jti": {
+          "type": "string",
+          "pattern": "^srp_[0-9a-hjkmnp-tv-z]{26}$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "origin": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^https://[a-z0-9][a-z0-9.-]*(?::[0-9]+)?$"
+    }
+  }
+}

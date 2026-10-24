@@ -32,6 +32,8 @@ to the vendor, documented in a post-signup context guide — never in discovery 
 | Identity-focused signup ledger and traceability | who/whom/which ToS/when/proof |
 | Abuse reporting and universal revocation | Contract D.2, kill switch |
 | Post-signup context pointer (identity-adjacent) | opaque `context.url` + `context.sha256` |
+| Relying Party identity | provider account, origin/audience verification, RP signing keys, broker-issued attestation, RP-signed receipts, authenticated abuse identity |
+| RP trust policy | trusted RP-broker list, per-RP `allow`/`warn`/`require`/`block`, assurance level display |
 
 ### 2.2 Out of scope (vendor responsibility)
 
@@ -96,7 +98,53 @@ Removing vendor capabilities from the protocol **MUST NOT** remove these in-scop
 
 ---
 
-## 6. Future-Change Review Checklist
+## 6. Relying Party Identity Is Identity
+
+`v1.2.0` adds a second identity to the protocol: the relying party's own broker-issued identity. It
+belongs here for the same reason the agent's identity does — it proves **who** the counterparty is,
+not what they sell.
+
+**In scope as protocol (RP identity):**
+
+- the provider account that owns an origin: registration, origin/audience proof, and RP signing keys
+  with proof of possession;
+- the broker-issued RP attestation and its publication in the optional `rp_attestation` field;
+- the provider API that issues and renews attestations (Contract H) and the broker metadata that
+  advertises JWKS/status/abuse endpoints (Contract I);
+- RP-signed receipts and authenticated receipt ingestion;
+- the RP abuse-report signature and the human-visible trust/distrust policy.
+
+**Out of scope as vendor responsibility (even when the RP is verified):**
+
+- product catalogs, SKUs, pricing, free-tier quotas, and provisioning APIs;
+- resource inventory, credential custody, instance lifecycle, and support tooling;
+- a provider account's commercial terms, billing checkout, or pricing model;
+- any per-provider capability list in discovery or the registry.
+
+A **provider account is not an agent-facing discovery field**. It is the RP's private relationship
+with its broker. Agents see the public attestation, the assurance level, and the trust decision; they
+never need an account with the RP's broker, and assertion verification never requires one.
+
+Verification is **identity**, not endorsement: a verified RP is a registered, origin-controlled entity,
+not a safe, solvent, or well-behaved one. The registry keeps conformance (the document passes the
+validator) separate from verification (a broker attestation and a recorded check), and an unverified
+entry stays listed.
+
+### 6.1 RP identity checklist additions
+
+In addition to §7, every proposed RP-identity change **MUST** answer:
+
+- [ ] Does it bind only identity (origin, audience, provider, keys), never terms, scopes, prices, or
+      capability?
+- [ ] Can an assertion still be verified without a vendor/provider account, SDK, or shared secret?
+- [ ] Does it avoid leaking a vendor capability into discovery or the receipt?
+- [ ] Does it avoid creating a second trust root or an implicit "verified means safe" claim?
+- [ ] Does it keep the human kill switch (`revoked`) distinct from operator protective action
+      (`suspended`)?
+- [ ] Does it keep local verification the default, with enforcement opt-in for `allow`/`warn` and
+      mandatory only for `require`?
+
+## 7. Future-Change Review Checklist
 
 Every proposed new protocol field or contract change **MUST** answer "yes" to at least one question
 below. If it does not, it belongs in the vendor's `SKILL.md`, not in the protocol.
@@ -115,7 +163,7 @@ Additional gates:
       API usage.
 - [ ] The change is not a vendor capability hidden under `extensions`.
 - [ ] The change is additive within v1, or it introduces a new `protocol` value and path.
-- [ ] The change does not weaken any security consideration in `agent-identity-v1.md` §14.
+- [ ] The change does not weaken any security consideration in `agent-identity-v1.md` §20.
 - [ ] The change is reflected consistently in the spec, the schema, the JSON Schema, the validator, and
       the reference implementation.
 
@@ -124,7 +172,7 @@ in this document first and escalate — never add it silently to the protocol.
 
 ---
 
-## 7. Allowed Vendor-Terminology Exceptions
+## 8. Allowed Vendor-Terminology Exceptions
 
 Vendor terminology may remain **only** where it is clearly vendor-owned or historical:
 
@@ -142,7 +190,7 @@ definitions, the implementation guide, or the registry.
 
 ---
 
-## 8. Authority & Escalation
+## 9. Authority & Escalation
 
 - `agent-identity-v1.md` is the normative protocol specification; this document is the normative scope
   boundary. Where a proposed change is tempted to widen protocol surface, this document governs.

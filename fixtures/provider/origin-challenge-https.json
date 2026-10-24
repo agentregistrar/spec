@@ -1,0 +1,8 @@
+{
+  "challenge_id": "ch_01j8z9x4m2n7p5q3r6s8t0vwxy",
+  "method": "https",
+  "file_url": "https://vaporcloud.example/.well-known/agent-signup-verify.txt",
+  "file_content": "8f3c2b1a9d7e6f504132537495867a0b",
+  "expires_at": "2026-10-24T00:30:00.000Z",
+  "__fixture_note": "Provider request/response example (Contract H §15): HTTPS origin challenge. Validated against the normative fields, not a public JSON Schema."
+}

@@ -49,6 +49,13 @@
       "type": "string",
       "format": "date-time"
     },
+    "rp_attestation": {
+      "description": "OPTIONAL Contract G RP attestation: a compact JWS signed by the RP's broker (typ agent-rp-attestation+jwt). Presence changes no other field. The attestation `rp.origin` MUST equal the origin of the discovery document actually fetched (never provider_url or terms.url) and `rp.audience` MUST equal `audience`. Absence is conformant and means unverified. A malformed value is a conformance error; a well-formed JWS that fails verification is a verification error, not a conformance error. Normative rules: agent-identity-v1.md §5.2, §5.4, and §14.",
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 16384,
+      "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+    },
     "issuer_allowlist": {
       "description": "Non-empty, unique list of absolute issuer origins accepted by this RP. No path, query, fragment, or wildcard.",
       "type": "array",

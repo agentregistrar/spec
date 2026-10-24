@@ -2,8 +2,9 @@
 
 - **Status:** Published.
 - **Machine-readable registry (canonical source):** [`implementations.json`](./implementations.json)
-- **Specification:** [`../agent-identity-v1.md`](../agent-identity-v1.md) — released as **v1.1.0** on 2026-10-18 ([release notes](../release-notes-v1.1.0.md)); the initial **v1.0.0** release (2026-10-17) is in [its release notes](../release-notes-v1.0.0.md).
-- **Conformance validator:** `src/validate-discovery.ts` — run as `pnpm validate:discovery <url-or-file> --json` ([validator guide](../validator.md)).
+- **Specification:** [`../agent-identity-v1.md`](../agent-identity-v1.md) — the **v1.2.0** revision is targeted for 2026-10-24 ([release notes](../release-notes-v1.2.0.md)); this branch is the reviewed artifact and the tag/publication follow the merge. Earlier releases are `v1.1.0` (2026-10-18) and `v1.0.0` (2026-10-17).
+- **Conformance and attestation validator:** `src/validate-discovery.ts` — run as `pnpm validate:discovery <url-or-file> --json` ([validator guide](../validator.md)).
+- **Registry validator and schema:** `src/validate-registry.ts` (`pnpm validate:registry [path] [--json]`) and [`implementations.schema.json`](./implementations.schema.json).
 - **Implementation guide:** [`../implementing-agent-identity-v1.md`](../implementing-agent-identity-v1.md).
 
 This registry is **adoption infrastructure**, not an enforcement mechanism. The validator is the
@@ -31,6 +32,34 @@ signed `context` pointer. Discovery is a parameter document, not a capability ca
 
 To be listed here, an implementation must also meet the entry criteria below.
 
+### 1.1 Verification is a separate, optional statement
+
+Conformance says the discovery **document** passes the validator. **Verification** is a different
+statement: a broker attests the RP's canonical origin, audience, provider identity, assurance level,
+and public keys (Contract G). It is OPTIONAL and **does not** make an entry conformant by itself, and
+conformance does **not** imply verification.
+
+An entry may carry an optional `verification` object:
+
+```json
+"verification": {
+  "broker": "https://agentregistrar.dev", "level": "domain",
+  "attestation_jti": "rpa_01j...", "checked_at": "2026-10-24T00:00:00Z",
+  "status": "active"
+}
+```
+
+All five fields are required when the object is present. `level` is `domain` or `entity`; `status` is
+`active`, `suspended`, or `revoked` and describes the attestation **at `checked_at`**. The registry is
+a snapshot: a later suspension or revocation does not rewrite the static entry or badge until a new
+check is recorded. **A verified entry requires a live attestation, a provider account with the
+attesting broker, and a recorded check** — the schema and validator can check the record's shape, not
+its liveness.
+
+Absence of `verification` means **conformant, unverified**. Unverified entries stay listed.
+Verification is **identity, not endorsement**: it does not assert the product's safety, uptime,
+solvency, or conduct.
+
 ## 2. Entry criteria
 
 1. **The identity-only validator passes** — `pnpm validate:discovery <discovery-url> --json` reports
@@ -38,9 +67,10 @@ To be listed here, an implementation must also meet the entry criteria below.
 2. **The discovery document is public and stable** — an HTTPS `/.well-known/agent-signup.json` on the implementation's canonical origin (spec §4), not a throwaway or per-deploy URL.
 3. **The contact is reachable** — a security/abuse/legal contact (email or URL) that someone actually monitors.
 4. **A post-signup context guide is published if the vendor has capabilities to document** — vendor features (catalog, provisioning, SKUs, API usage, errors) belong in that guide, not in discovery or this registry.
+5. **Optional: a recorded verification snapshot** — if the entry claims verification, it carries all five `verification` fields, the attestation is live at `checked_at`, and the broker and provider account are real. Verification is not required for listing.
 
 Meeting these criteria is a statement about the **discovery document only**. It is **not** a broker
-endorsement of the implementation's product, security posture, uptime, or pricing (see §5).
+endorsement of the implementation's product, security posture, uptime, or pricing (see §6).
 
 **Reference-entry exception (documented, not a precedent).** The VaporCloud reference entry in §3
 does not yet meet criterion 2 in full: its `discovery_url` is the **intended production** URL on an
@@ -63,9 +93,9 @@ The table below is kept **in lockstep** with [`implementations.json`](./implemen
 document is the canonical machine-readable source. Registry `capabilities` are **protocol**
 capabilities only; vendor features are never listed.
 
-| Implementation | Discovery URL | Audience | Protocol | Capabilities | Contact | Validated |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **VaporCloud** (reference) | `https://vaporcloud.example/.well-known/agent-signup.json` | `vaporcloud` | `agent-identity-v1` | `agent_signup`, `post_signup_context` | `security@vaporcloud.example` | 2026-10-17 |
+| Implementation | Discovery URL | Audience | Protocol | Capabilities | Contact | Validated | Verification |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **VaporCloud** (reference) | `https://vaporcloud.example/.well-known/agent-signup.json` | `vaporcloud` | `agent-identity-v1` | `agent_signup`, `post_signup_context` | `security@vaporcloud.example` | 2026-10-17 | unverified (no `verification` object yet) |
 
 Registry metadata (validator version, exact commands, and observed protocol/audience) lives in the
 machine-readable file. Each entry's `validator_evidence` records the concrete command and result.
@@ -97,15 +127,30 @@ provisioning API, legacy OTP fallback, admin actions) are documented in its post
    `capabilities` (protocol capabilities only), `contact`, `validated_at`, `validator_version`, and a
    `validator_evidence` object containing the exact command and the resulting counts
    (`protocol` and `audience` read directly from the `--json` output — see the
-   [validator field reference](../validator.md#9---json-field-reference-for-the-implementation-registry)).
-4. Update the table in §3 of this README so the two stay in lockstep.
-5. The pull request is reviewed against the entry criteria in §2.
+   [validator field reference](../validator.md#12---json-field-reference-for-the-implementation-registry)).
+   If you also claim verification, add the five-field `verification` object described in §1.1,
+   including the attesting broker, assurance level, attestation `jti`, `checked_at`, and status.
+4. Validate the registry locally: `pnpm --silent validate:registry registry/implementations.json --json`
+   must report `valid: true`, `exitCode: 0`.
+5. Update the table in §3 of this README so the two stay in lockstep.
+6. The pull request is reviewed against the entry criteria in §2.
 
 To update or remove an entry (for example after dropping `agent-identity-v1` support), submit a pull
 request with the validator evidence for the change. An entry whose document no longer passes the
 validator is removed.
 
-## 5. Conformance badge
+## 5. Verified-provider badge
+
+A **verified** badge renders only when an entry's `verification.status` is `active` **at
+`checked_at`**. It shows the attesting `broker` and the assurance `level`, and links to that broker's
+metadata (`/.well-known/agent-broker.json`). It says the RP's origin and identity were attested by
+that broker at that time — not that the provider is safe, solvent, or recommendable.
+
+An entry with no `verification`, or with a non-`active` snapshot, renders as **conformant,
+unverified**. A suspension or revocation that happens after `checked_at` is not retroactively written
+into the static entry; record a new check to update it.
+
+## 6. Conformance badge
 
 Implementations listed in the registry may display the following badge. It states that the
 implementation's **discovery document** is `agent-identity-v1` conformant; it links to the
@@ -148,17 +193,19 @@ the `<…>` placeholders once hosting exists. In-repo, the link targets are
 - **Follow the spec.** If the badge's linked criteria and the specification disagree, the
   specification wins.
 
-## 6. Canonical links
+## 7. Canonical links
 
 | Artifact | Location |
 | :--- | :--- |
-| Specification (`v1.1.0`) | [`../agent-identity-v1.md`](../agent-identity-v1.md) |
+| Specification (`v1.2.0`) | [`../agent-identity-v1.md`](../agent-identity-v1.md) |
 | Scope boundaries rulebook | [`../scope-boundaries.md`](../scope-boundaries.md) |
-| Conformance validator guide | [`../validator.md`](../validator.md) |
+| Conformance + attestation validator guide | [`../validator.md`](../validator.md) |
+| Registry schema | [`./implementations.schema.json`](./implementations.schema.json) |
 | Implementation guide (new RPs) | [`../implementing-agent-identity-v1.md`](../implementing-agent-identity-v1.md) |
+| Release notes (`v1.2.0`, this branch) | [`../release-notes-v1.2.0.md`](../release-notes-v1.2.0.md) |
 | Release notes (`v1.1.0`) | [`../release-notes-v1.1.0.md`](../release-notes-v1.1.0.md) |
 | Release notes (`v1.0.0`) | [`../release-notes-v1.0.0.md`](../release-notes-v1.0.0.md) |
 | Machine-readable registry | [`./implementations.json`](./implementations.json) |
 
 This repository is the **canonical location** of the specification until a rendered copy is hosted
-at a final URL (spec §16). The protocol's `spec` discovery field stays **OPTIONAL** until then.
+at a final URL (spec §22). The protocol's `spec` discovery field stays **OPTIONAL** until then.

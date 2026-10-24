@@ -4,12 +4,13 @@
   "protocol": "agent-identity-v1",
   "spec": "agent-identity-v1.md",
   "registry_criteria": "registry/README.md",
-  "updated_at": "2026-10-18",
+  "updated_at": "2026-10-24",
   "capability_vocabulary": [
     "agent_signup",
     "post_signup_context"
   ],
   "capability_vocabulary_note": "Protocol capabilities only. Vendor features such as provisioning, catalogs, SKUs, pricing, OTP endpoints, and resource APIs are vendor responsibilities documented in the vendor's post-signup guide, not protocol capabilities, and must never appear here.",
+  "verification_note": "OPTIONAL per-entry `verification` object (broker, level, attestation_jti, checked_at, status), validated by registry/implementations.schema.json. Conformance and verification are separate, and the object is a snapshot at checked_at. No entry is marked verified in v1.2.0; Issue 15 adds VaporCloud’s object after a live attestation exists.",
   "validator": {
     "id": "agent-identity-v1",
     "version": "1.0.0",

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.agentregistrar.dev/agent-identity/v1/broker-metadata.schema.json",
+  "title": "Agent Identity broker metadata (agent-broker.json)",
+  "description": "Contract I: the public document served at GET /.well-known/agent-broker.json. All six fields are REQUIRED and unknown fields are not permitted. `issuer` MUST equal the origin of the document itself and the `iss` of every attestation the broker signs; a differing issuer invalidates the document. `jwks_uri` MUST be same-origin with `issuer` (a cross-field rule enforced by Zod and the validator, not expressible here). Cross-origin `attestation_status_uri`/`abuse_endpoint` are allowed but must pass the same SSRF rules; same-origin is RECOMMENDED. Normative definition: agent-identity-v1.md §16.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "issuer",
+    "jwks_uri",
+    "attestation_status_uri",
+    "abuse_endpoint",
+    "protocol_versions",
+    "contact"
+  ],
+  "properties": {
+    "issuer": {
+      "description": "Canonical origin of this document; MUST equal the `iss` of every attestation the broker signs.",
+      "$ref": "#/$defs/origin"
+    },
+    "jwks_uri": {
+      "description": "Absolute HTTPS URL of the broker JWKS. MUST be on the same origin as `issuer`.",
+      "$ref": "#/$defs/httpsUrl"
+    },
+    "attestation_status_uri": {
+      "description": "Absolute HTTPS URL of the signed attestation status endpoint (spec §5.5 / §16).",
+      "$ref": "#/$defs/httpsUrl"
+    },
+    "abuse_endpoint": {
+      "description": "Absolute HTTPS URL accepting Contract D.2 authenticated abuse reports.",
+      "$ref": "#/$defs/httpsUrl"
+    },
+    "protocol_versions": {
+      "description": "Non-empty, unique list of protocol versions; MUST contain `agent-identity-v1`.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "contains": {
+        "const": "agent-identity-v1"
+      }
+    },
+    "contact": {
+      "description": "Email address or absolute HTTPS URL a human can use for security/abuse contact.",
+      "$ref": "#/$defs/contact"
+    }
+  },
+  "$defs": {
+    "origin": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^https://[a-z0-9][a-z0-9.-]*(?::[0-9]+)?$"
+    },
+    "httpsUrl": {
+      "type": "string",
+      "minLength": 1,
+      "format": "uri",
+      "pattern": "^https://[^\\s]+$"
+    },
+    "contact": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:[^@\\s]+@[^@\\s]+\\.[^@\\s]+|https://[^\\s]+)$"
+    }
+  }
+}

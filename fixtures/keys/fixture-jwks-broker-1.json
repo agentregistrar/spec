@@ -1,0 +1,14 @@
+{
+  "issuer": "https://rp-broker.example",
+  "comment": "TEST VECTOR ONLY — public JWKS for fixture attestations; never a production broker.",
+  "keys": [
+    {
+      "kid": "broker-1-key-2026-10",
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "x": "hQ5CXXlLHywmWHmTxTYZSf2As7VAGSiSjpkAXbaf-xw",
+      "alg": "EdDSA",
+      "use": "sig"
+    }
+  ]
+}
