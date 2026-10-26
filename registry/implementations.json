@@ -4,19 +4,19 @@
   "protocol": "agent-identity-v1",
   "spec": "agent-identity-v1.md",
   "registry_criteria": "registry/README.md",
-  "updated_at": "2026-10-24",
+  "updated_at": "2026-10-26",
   "capability_vocabulary": [
     "agent_signup",
     "post_signup_context"
   ],
   "capability_vocabulary_note": "Protocol capabilities only. Vendor features such as provisioning, catalogs, SKUs, pricing, OTP endpoints, and resource APIs are vendor responsibilities documented in the vendor's post-signup guide, not protocol capabilities, and must never appear here.",
-  "verification_note": "OPTIONAL per-entry `verification` object (broker, level, attestation_jti, checked_at, status), validated by registry/implementations.schema.json. Conformance and verification are separate, and the object is a snapshot at checked_at. No entry is marked verified in v1.2.0; Issue 15 adds VaporCloud’s object after a live attestation exists.",
+  "verification_note": "OPTIONAL per-entry `verification` object (broker, level, attestation_jti, checked_at, status), validated by registry/implementations.schema.json. Conformance and verification are separate, and the object is a snapshot at checked_at. VaporCloud carries a domain-level snapshot from the live 2026-10-26 check; the registry is not a live feed and verification is not a safety or endorsement claim.",
   "validator": {
     "id": "agent-identity-v1",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "script": "src/validate-discovery.ts",
     "run": "pnpm validate:discovery <url-or-file> --json",
-    "evidence_note": "The reference_run and fixture_run below are the recorded v1.0.0 release evidence, retained here as historical record. The self-contained validator package (@agentregistrar/discovery, Apache-2.0, source-first) now lives in this repository under src/; fixture_run shows its command in this repository's layout. A live re-validation of the deployed reference implementation was performed on 2026-10-18 with this package (valid: true, exit 0, zero failures); publishing the live entry here awaits operator approval, so the VaporCloud entry below keeps its illustrative .example URLs. The current released package is @agentregistrar/discovery 1.1.0 (npm latest); the version fields recorded below are the historical 2026-10-17 v1.0.0 run evidence and are intentionally unchanged.",
+    "evidence_note": "The reference_run and fixture_run below are the recorded v1.0.0 release evidence, retained here as historical record. The current validator is 1.2.0; the VaporCloud entry records the live URL-mode v1.2.0 run from 2026-10-26. Its verification object is a snapshot at checked_at, not a live status feed.",
     "reference_run": {
       "date": "2026-10-17",
       "command": "pnpm validate:discovery http://localhost:3001/.well-known/agent-signup.json --json",
@@ -62,36 +62,47 @@
     {
       "name": "VaporCloud",
       "role": "reference implementation",
-      "url": "https://vaporcloud.example",
-      "discovery_url": "https://vaporcloud.example/.well-known/agent-signup.json",
-      "discovery_url_note": "Intended production discovery URL for the reference implementation. The recorded validator run validated the locally started reference implementation (see validator_evidence.source), not this public URL; this entry is reproducible locally but has not been re-validated from the public internet.",
+      "url": "https://skdl.dev",
+      "discovery_url": "https://skdl.dev/.well-known/agent-signup.json",
+      "discovery_url_note": "Live production discovery URL for the VaporCloud reference implementation, validated from the public internet on 2026-10-26.",
       "audience": "vaporcloud",
       "protocol": "agent-identity-v1",
       "capabilities": [
         "agent_signup",
         "post_signup_context"
       ],
-      "contact": "security@vaporcloud.example",
-      "post_signup_guide": "https://vaporcloud.example/docs/SKILL.md",
-      "validated_at": "2026-10-17",
-      "validator_version": "1.0.0",
+      "contact": "security@skdl.dev",
+      "post_signup_guide": "https://skdl.dev/docs/SKILL.md",
+      "validated_at": "2026-10-26",
+      "validator_version": "1.2.0",
       "validator_evidence": {
-        "command": "pnpm validate:discovery http://localhost:3001/.well-known/agent-signup.json --json",
+        "command": "pnpm validate:discovery https://skdl.dev/.well-known/agent-signup.json --verify-attestation --require-attestation --trusted-rp-broker https://agentregistrar.dev --json",
         "mode": "url",
-        "source": "http://localhost:3001/.well-known/agent-signup.json",
+        "source": "https://skdl.dev/.well-known/agent-signup.json",
         "exit_code": 0,
         "valid": true,
         "counts": {
-          "passed": 22,
+          "passed": 23,
           "failed": 0,
           "warnings": 0,
           "probes": 0
         },
         "observed": {
           "protocol": "agent-identity-v1",
-          "audience": "vaporcloud"
+          "audience": "vaporcloud",
+          "providerName": "VaporCloud",
+          "attestation_status": "verified",
+          "attestation_level": "domain",
+          "attestation_jti": "rpa_01m5vggft4vn3x9bfw9wy6b8zn"
         },
-        "note": "Passed against the locally started VaporCloud reference implementation on 2026-10-17 (counts: 22 passed, 0 failed, 0 warnings). The --json errors and warnings arrays were both empty; numeric totals live under counts. The same discovery builder is also the checked-in fixture fixtures/valid-full.json, which passes in file mode (17 passed, 0 failed, 0 warnings). A live re-validation of the deployed reference implementation was performed on 2026-10-18 (see registry/README.md §2); its live URL is not published here pending operator approval."
+        "note": "Live URL-mode v1.2.0 run on 2026-10-26: 23 checks passed, 0 failed, 0 warnings; the attestation verified against https://agentregistrar.dev/.well-known/jwks.json at 2026-10-26T07:23:40.000Z. The verification object below is the snapshot from this check."
+      },
+      "verification": {
+        "broker": "https://agentregistrar.dev",
+        "level": "domain",
+        "attestation_jti": "rpa_01m5vggft4vn3x9bfw9wy6b8zn",
+        "checked_at": "2026-10-26T07:23:40.000Z",
+        "status": "active"
       }
     }
   ]

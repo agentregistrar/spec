@@ -2,7 +2,7 @@
 
 - **Status:** Published.
 - **Machine-readable registry (canonical source):** [`implementations.json`](./implementations.json)
-- **Specification:** [`../agent-identity-v1.md`](../agent-identity-v1.md) — the **v1.2.0** revision is targeted for 2026-10-24 ([release notes](../release-notes-v1.2.0.md)); this branch is the reviewed artifact and the tag/publication follow the merge. Earlier releases are `v1.1.0` (2026-10-18) and `v1.0.0` (2026-10-17).
+- **Specification:** [`../agent-identity-v1.md`](../agent-identity-v1.md) — **v1.2.0**, released 2026-10-24 and tagged `v1.2.0` ([release notes](../release-notes-v1.2.0.md)). Earlier releases are `v1.1.0` (2026-10-18) and `v1.0.0` (2026-10-17).
 - **Conformance and attestation validator:** `src/validate-discovery.ts` — run as `pnpm validate:discovery <url-or-file> --json` ([validator guide](../validator.md)).
 - **Registry validator and schema:** `src/validate-registry.ts` (`pnpm validate:registry [path] [--json]`) and [`implementations.schema.json`](./implementations.schema.json).
 - **Implementation guide:** [`../implementing-agent-identity-v1.md`](../implementing-agent-identity-v1.md).
@@ -72,20 +72,22 @@ solvency, or conduct.
 Meeting these criteria is a statement about the **discovery document only**. It is **not** a broker
 endorsement of the implementation's product, security posture, uptime, or pricing (see §6).
 
-**Reference-entry exception (documented, not a precedent).** The VaporCloud reference entry in §3
-does not yet meet criterion 2 in full: its `discovery_url` is the **intended production** URL on an
-illustrative `.example` origin, while its recorded validation ran against the **locally started**
-reference implementation (`validator_evidence.source`). The entry is reproducible locally but not
-yet re-validatable from the public internet. New third-party entries must meet criterion 2 as
-written.
+**Reference entry.** VaporCloud now meets criterion 2: its entry uses the live
+`https://skdl.dev/.well-known/agent-signup.json` and was re-validated from the public internet on
+2026-10-26. The earlier `.example`/local-run exception is retired.
 
-**Live re-validation (2026-10-18).** The deployed reference implementation was re-validated live with
-the self-contained `@agentregistrar/discovery` validator —
-`pnpm validate:discovery <discovery-url> --json --probe-jwks` — reporting `valid: true`, `exit 0`,
-zero errors, zero warnings, 22 checks passed, and a passing issuer JWKS probe. This note does **not**
-refresh the published entry: publishing the live demo URL awaits operator approval, so the VaporCloud
-entry in §3 keeps its illustrative `.example` URLs and the reference-entry exception above remains in
-force.
+**Live re-validation (2026-10-26).** The deployed reference implementation was validated with the
+v1.2.0 self-contained validator:
+
+```bash
+pnpm validate:discovery https://skdl.dev/.well-known/agent-signup.json \
+  --verify-attestation --require-attestation \
+  --trusted-rp-broker https://agentregistrar.dev --json
+```
+
+Result: `valid: true`, exit `0`, zero errors, zero warnings, **23 checks passed**, and the attestation
+verified at level `domain` against `https://agentregistrar.dev/.well-known/jwks.json`. The entry in
+§3 records this run and the five-field `verification` snapshot.
 
 ## 3. Registered implementations
 
@@ -95,22 +97,26 @@ capabilities only; vendor features are never listed.
 
 | Implementation | Discovery URL | Audience | Protocol | Capabilities | Contact | Validated | Verification |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **VaporCloud** (reference) | `https://vaporcloud.example/.well-known/agent-signup.json` | `vaporcloud` | `agent-identity-v1` | `agent_signup`, `post_signup_context` | `security@vaporcloud.example` | 2026-10-17 | unverified (no `verification` object yet) |
+| **VaporCloud** (reference) | `https://skdl.dev/.well-known/agent-signup.json` | `vaporcloud` | `agent-identity-v1` | `agent_signup`, `post_signup_context` | `security@skdl.dev` | 2026-10-26 | verified (domain) |
 
 Registry metadata (validator version, exact commands, and observed protocol/audience) lives in the
 machine-readable file. Each entry's `validator_evidence` records the concrete command and result.
 
-**Declared vs validated origin.** VaporCloud's `discovery_url` is the intended production discovery
-URL for the reference implementation, while the recorded run in `validator_evidence.source`
-validated the locally started reference implementation (`http://localhost:3001/…`). The entry is
-reproducible locally but has not been re-validated from the public internet.
+VaporCloud's `verification` object records broker `https://agentregistrar.dev`, level `domain`,
+attestation jti `rpa_01m5vggft4vn3x9bfw9wy6b8zn`, `checked_at` `2026-10-26T07:23:40.000Z`, and
+`status:"active"`. It is a **snapshot**, not a live status feed; the broker attestation in discovery
+is the live proof, and verification is identity, not safety or endorsement.
+
+**Live origin.** VaporCloud's `discovery_url` and `validator_evidence.source` are both the public
+`https://skdl.dev/.well-known/agent-signup.json`; the recorded run was URL-mode from the public
+internet.
 
 ### Reference implementation: VaporCloud
 
 VaporCloud is the reference Relying Party. Its identity-only discovery document is built to the
-shared schema and served at `GET /.well-known/agent-signup.json`. Its vendor features (catalog,
-provisioning API, legacy OTP fallback, admin actions) are documented in its post-signup guide at
-`https://vaporcloud.example/docs/SKILL.md`, reached through the signed `context` pointer — they are
+shared schema and served at `https://skdl.dev/.well-known/agent-signup.json`. Its vendor features
+(catalog, provisioning API, legacy OTP fallback, admin actions) are documented in its post-signup
+guide at `https://skdl.dev/docs/SKILL.md`, reached through the signed `context` pointer — they are
 **not** part of discovery and **not** registry capabilities.
 
 ## 4. How to submit an entry
@@ -202,7 +208,7 @@ the `<…>` placeholders once hosting exists. In-repo, the link targets are
 | Conformance + attestation validator guide | [`../validator.md`](../validator.md) |
 | Registry schema | [`./implementations.schema.json`](./implementations.schema.json) |
 | Implementation guide (new RPs) | [`../implementing-agent-identity-v1.md`](../implementing-agent-identity-v1.md) |
-| Release notes (`v1.2.0`, this branch) | [`../release-notes-v1.2.0.md`](../release-notes-v1.2.0.md) |
+| Release notes (`v1.2.0`) | [`../release-notes-v1.2.0.md`](../release-notes-v1.2.0.md) |
 | Release notes (`v1.1.0`) | [`../release-notes-v1.1.0.md`](../release-notes-v1.1.0.md) |
 | Release notes (`v1.0.0`) | [`../release-notes-v1.0.0.md`](../release-notes-v1.0.0.md) |
 | Machine-readable registry | [`./implementations.json`](./implementations.json) |
