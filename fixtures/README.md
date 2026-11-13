@@ -13,7 +13,7 @@ and provider-request surfaces, plus the expected results the manual harness comp
 | :--- | :--- |
 | `*.json` | Discovery documents (valid/invalid) and broker metadata fixtures. |
 | `attestations/*.jwt` | Contract G compact JWS fixtures. |
-| `attestation-sources/*.json` | A `{ status, body }` stand-in for an `attestation.uri` HTTP response (v1.3.0 source documents and typed broker failures). |
+| `attestation-sources/*.json` | A `{ status, body, contentType? }` stand-in for an `attestation.uri` HTTP response (v1.3.0 source documents and typed broker failures). |
 | `receipts/*.jwt` | Contract E v1.2 compact JWS fixtures. |
 | `abuse/*.jwt` | Contract D.2 compact JWS fixtures. |
 | `status/*.jwt` | Contract I status compact JWS fixtures. |
@@ -57,7 +57,7 @@ Three fixture-only top-level fields are used and are warning-level unknown field
   validate the URL; a fixture without a declared origin reports the provider binding as unchecked
   (`attestation_binding_unchecked`) and the attestation as `unavailable` / `origin_unverifiable`,
   never `verified`.
-- `__fixture_rp_attestation_source` — used by **one** fixture only
+- `__fixture_removed_attestation_source` — used by **one** fixture only
   (`invalid-rp-attestation-removed.json`): the signer copies that JWS into the removed `rp_attestation`
   field so the conformance failure is proven against an authentic token.
 
@@ -71,11 +71,12 @@ Each row names a `kind` (`discovery`, `attestation`, `receipt`, `abuse`, `status
 `provider`, `source`), its input path/JWS, optional discovery/verification options, and the expected
 outcome. Discovery rows use the same code as the CLI (`--verify-attestation`, `--require-attestation`,
 `--trusted-rp-broker`, `--jwks`, `--at`, `--source-response`). `sourceResponse` points at a
-`{ status, body }` fixture so verification runs offline; a typed broker response is a verification
-result, never a conformance failure. The harness also checks every JWS claim set against its checked-in
-JSON Schema, compares producer mode (closed JSON Schema + strict Zod) with verifier mode (known fields
-only) for attestations, and validates every `200` source body against `attestation-source.schema.json`
-plus `AttestationSourceDocumentSchema`.
+`{ status, body, contentType? }` fixture so verification runs offline; `contentType` defaults to
+`application/json`, and an injected response skips the network-target probe refusal because nothing is
+fetched. A typed broker response is a verification result, never a conformance failure. The harness also
+checks every JWS claim set against its checked-in JSON Schema, compares producer mode (closed JSON
+Schema + strict Zod) with verifier mode (known fields only) for attestations, and validates every `200`
+source body against `attestation-source.schema.json` plus `AttestationSourceDocumentSchema`.
 
 A `crossFieldOnly: true` row is valid under the closed JSON Schema but rejected by Zod/verification
 for a rule JSON Schema cannot express (currently: unique `keys[].kid`).
@@ -91,17 +92,20 @@ for a rule JSON Schema cannot express (currently: unique `keys[].kid`).
 | `valid-attestation-provider.json` | provider mode on the discovery origin: `verified`, mode `provider`, exit `0` |
 | `valid-attestation-broker.json` without `--verify-attestation` | conformant, `not_checked`, exit `0` |
 | `invalid-attestation-mode.json` (`mode: "embedded"`) | conformance failure, exit `1`, `field.attestation.mode` / `attestation_mode_invalid`; `attestation.status` is `not_checked`, not `invalid` |
-| `invalid-attestation-uri-relative.json`, `invalid-attestation-uri-http.json` | conformance failure, exit `1`, `field.attestation.uri` / `attestation_uri_invalid` |
+| `invalid-attestation-uri-relative.json`, `invalid-attestation-uri-http.json`, `invalid-attestation-uri-userinfo.json`, `invalid-attestation-uri-fragment.json` | conformance failure, exit `1`, `field.attestation.uri` / `attestation_uri_invalid`; the URI is never fetched |
 | `invalid-attestation-not-object.json` (`attestation` is a string) | conformance failure, exit `1`, `not_checked` / `field_malformed` |
 | `invalid-attestation-broker-host.json` | conformance failure, exit `1`, `field.attestation.binding` / `attestation_uri_host_untrusted`; the URI is never fetched |
 | `invalid-attestation-provider-host.json` | conformance failure, exit `1`, `field.attestation.binding` / `attestation_uri_host_unbound` |
-| `invalid-rp-attestation-removed.json` | conformance failure, exit `1`, `field.rp_attestation` / `rp_attestation_removed` |
+| `invalid-rp-attestation-removed.json` | conformance failure, exit `1`, `field.rp_attestation` / `rp_attestation_removed`; reported once, never repeated as an "ignored" unknown top-level field |
 | `unverifiable-attestation-no-origin.json` (no `__fixture_origin`) | conformant; binding `skip` / `attestation_binding_unchecked`; `unavailable` / `origin_unverifiable`, exit `0` |
 | `valid-attestation-broker.json` with a typed response | `403` → `suspended` / `provider_suspended`; `404` → `unverified` / `attestation_not_found`; `410` → `invalid` / `attestation_revoked`; `503` → `unavailable` / `broker_unavailable`; all exit `0` without `--require-attestation` and remain conformant |
 | `valid-attestation-expired.json` | `expired` / `attestation_expired`, exit `0`; exit `1` with `--require-attestation` (at 2026-11-30) |
 | `valid-attestation-broker.json` with no trusted broker | `attested_untrusted_broker`, exit `0`; exit `1` with `--require-attestation` |
 | `valid-attestation-broker.json` with a missing JWKS | `unavailable` / `rp_broker_unavailable`, exit `0`; exit `2` with `--require-attestation` |
 | `valid-attestation-provider.json` with a wrapped token or a raw JWT body | `invalid` / `source_document_invalid`; only `{ "attestation": "<compact JWS>" }` is accepted |
+| `valid-attestation-provider.json` with `contentType: "text/plain"` | `invalid` / `source_document_invalid`; a `200` source must be served as `application/json` |
+| `valid-attestation-provider.json` with an oversize source (>16384 characters) | `invalid` / `source_document_invalid`; the 16 KiB cap is enforced before JWT verification |
+| `valid-attestation-broker.json` with a JWT from a different trusted broker origin | `invalid` / `attestation_issuer_mismatch`; broker-mode `iss` must equal the source URI origin |
 | `invalid-json-body.json` (deliberately truncated JSON) | conformance failure, exit `1`, `conformance.evaluated: true`, no `fetchFailure` |
 | `does-not-exist.json` (path only, no file) | operational failure, exit `2`, `conformance.valid: null`, `evaluated: false`, error under `fetchFailure` |
 
@@ -116,6 +120,9 @@ Full broker/provider requests in a live run use the same flags without `--source
 | `ok-expired.json` | `{ "attestation": "<expired JWS>" }` | valid source document; verification reports `expired` at a later clock |
 | `ok-wrapped-token.json` | `{ "token": "<JWS>" }` | invalid: the source field is `attestation`, not `token` |
 | `ok-raw-jwt-body.json` | `"<JWS>"` | invalid: a raw JWT body is not a source document |
+| `wrong-content-type.json` | `{ "attestation": "<JWS>" }` with `contentType: text/plain` | invalid on verification: `source_document_invalid` |
+| `ok-broker-other-issuer.json` | `{ "attestation": "<JWS from another trusted broker>" }` | valid source document; broker-mode verification reports `attestation_issuer_mismatch` |
+| `oversize-source.json` | `{ "attestation": "<16422-character compact-JWS-shaped value>" }` | invalid: exceeds the 16 KiB cap |
 | `forbidden-403-provider-suspended.json` | typed `403` body | verification `suspended` |
 | `not-found-404-attestation-not-found.json` | typed `404` body | verification `unverified` |
 | `gone-410-attestation-revoked.json` | typed `410` body | verification `invalid` / `attestation_revoked` |

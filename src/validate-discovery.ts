@@ -151,6 +151,8 @@ interface ParsedOptions {
 export interface InjectedAttestationSourceResponse {
   status: number;
   body: unknown;
+  /** `Content-Type` of the stand-in response (default `application/json`). */
+  contentType?: string;
 }
 
 /** Env fallback for the trusted RP-broker list (spec §5.14). */
@@ -768,7 +770,8 @@ function checkOptionalFields(document: Record<string, unknown>): Check {
  *     `attestation_revoked` (410), `invalid_request` (400), `rate_limited` (429),
  *     `broker_unavailable` (5xx)
  *   - `source_unavailable`, `source_document_invalid`,
- *     `source_response_unreadable`, `attestation_issuer_mismatch`
+ *     `source_response_unreadable`, `source_uri_invalid`,
+ *     `attestation_issuer_mismatch`
  */
 
 /** Mirrors the frozen mode enum (`AttestationModeSchema`). */
@@ -845,6 +848,15 @@ function checkAttestationUri(raw: unknown): Check {
   return ok(id, title, `attestation.uri is a stable absolute source URL (${String(raw.uri)})`);
 }
 
+/** Canonical origin form (`new URL(value).origin`), or `null` when unparseable. */
+function canonicalOrigin(value: string): string | null {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
 /** True when `uri` has the same scheme/port and the same host or a subdomain of it. */
 function isSameOrSubdomainOrigin(uri: URL, documentOrigin: string): boolean {
   let origin: URL;
@@ -888,13 +900,18 @@ function checkAttestationBinding(
   if (url === null || attestationUriProblem(raw.uri) !== null) {
     return skip(id, title, "binding not checked: attestation.uri is not a valid source URL");
   }
-  const uriOrigin = normalizeOrigin(url.origin);
+  const uriOrigin = url.origin;
 
   if (raw.mode === "broker") {
     const allowlist = Array.isArray(document.issuer_allowlist)
       ? document.issuer_allowlist.filter((entry): entry is string => typeof entry === "string")
       : [];
-    const inAllowlist = allowlist.some((entry) => normalizeOrigin(entry) === uriOrigin);
+    // Canonicalize each entry exactly like the source URI origin, so an
+    // allowlist written as `https://host:443` still matches `https://host`.
+    const allowlistOrigins = allowlist
+      .map((entry) => canonicalOrigin(entry))
+      .filter((entry): entry is string => entry !== null);
+    const inAllowlist = allowlistOrigins.includes(uriOrigin);
     if (!inAllowlist) {
       return fail(
         id,
@@ -1097,7 +1114,20 @@ async function injectedSourceResponse(
       error: '--source-response file must be `{ "status": <number>, "body": <json> }`',
     };
   }
-  return { response: { status: parsed.status, body: parsed.body }, error: null };
+  if (parsed.contentType !== undefined && typeof parsed.contentType !== "string") {
+    return {
+      response: null,
+      error: '--source-response `contentType` must be a string when present',
+    };
+  }
+  return {
+    response: {
+      status: parsed.status,
+      body: parsed.body,
+      ...(typeof parsed.contentType === "string" ? { contentType: parsed.contentType } : {}),
+    },
+    error: null,
+  };
 }
 
 /**
@@ -1127,11 +1157,13 @@ async function resolveAttestationSource(
   let status: number;
   let text: string | null = null;
   let body: unknown = null;
-  let contentType: string | null = null;
+  // Injected responses default to `application/json`; a real fetch must send it.
+  let contentType = "application/json";
 
   if (injected.response !== null) {
     status = injected.response.status;
     body = injected.response.body;
+    contentType = injected.response.contentType ?? "application/json";
   } else {
     const outcome = await fetchResource(source.uri, {
       timeoutMs: options.timeoutMs,
@@ -1140,7 +1172,10 @@ async function resolveAttestationSource(
       acceptStatus: source.mode === "broker" ? isBrokerSourceStatus : (value) => value === 200,
     });
     if (!outcome.ok) {
-      const detail = outcome.message;
+      const detail =
+        outcome.kind === "status" && outcome.status !== undefined
+          ? `the source returned HTTP ${outcome.status}`
+          : outcome.message;
       return source.mode === "broker"
         ? {
             ok: false,
@@ -1157,20 +1192,20 @@ async function resolveAttestationSource(
     }
     status = outcome.status;
     text = outcome.text;
-    contentType = outcome.headers.get("content-type");
+    contentType = outcome.headers.get("content-type") ?? "";
   }
 
   if (status === 200) {
+    const mime = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+    if (mime !== "application/json") {
+      return {
+        ok: false,
+        status: "invalid",
+        reason: "source_document_invalid",
+        message: `the source document must be served as application/json (received ${mime || "(none)"})`,
+      };
+    }
     if (text !== null) {
-      const mime = (contentType ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
-      if (mime !== "application/json") {
-        return {
-          ok: false,
-          status: "invalid",
-          reason: "source_document_invalid",
-          message: `the source document must be served as application/json (received ${mime || "(none)"})`,
-        };
-      }
       try {
         body = JSON.parse(text);
       } catch {
@@ -1277,20 +1312,23 @@ async function evaluateAttestation(
 
   // Reuse the document-derived probe guard: a public document cannot steer this
   // opt-in fetch at a loopback/link-local/private target, and a plain http
-  // target is refused unless the input origin is localhost/127.0.0.1.
-  const refusal = probeTargetRefusal(source.uri, inputOrigin);
-  if (refusal !== null) {
-    return {
-      checks,
-      result: sourceStatusResult(
-        options,
-        "unavailable",
-        source.mode === "broker" ? "broker_unavailable" : "source_unavailable",
-        `the attestation source was not fetched: ${refusal}`,
-        source.mode,
-        source.uri,
-      ),
-    };
+  // target is refused unless the input origin is localhost/127.0.0.1. An
+  // injected `--source-response` performs no fetch, so the guard does not apply.
+  if (options.sourceResponse === null && options.sourceResponsePath === null) {
+    const refusal = probeTargetRefusal(source.uri, inputOrigin);
+    if (refusal !== null) {
+      return {
+        checks,
+        result: sourceStatusResult(
+          options,
+          "unavailable",
+          source.mode === "broker" ? "broker_unavailable" : "source_unavailable",
+          `the attestation source was not fetched: ${refusal}`,
+          source.mode,
+          source.uri,
+        ),
+      };
+    }
   }
 
   const resolved = await resolveAttestationSource(source, options);
@@ -1381,9 +1419,20 @@ function checkScopeBoundary(findings: ForbiddenFinding[]): Check {
   );
 }
 
+/**
+ * Top-level fields handled by a dedicated check. They MUST NOT also appear in
+ * `warn.unknown-top-level-fields`: `rp_attestation` is removed in v1.3.0 and is
+ * a hard conformance failure (`field.rp_attestation`), so describing it as an
+ * ignored additive field in the same transcript would contradict the verdict.
+ */
+const DEDICATED_TOP_LEVEL_FIELDS: ReadonlySet<string> = new Set(["rp_attestation"]);
+
 function checkUnknownTopLevel(document: Record<string, unknown>, forbiddenTopLevel: Set<string>): Check {
   const unknown = Object.keys(document).filter(
-    (key) => !ALLOWED_TOP_LEVEL_FIELDS.has(key) && !forbiddenTopLevel.has(key),
+    (key) =>
+      !ALLOWED_TOP_LEVEL_FIELDS.has(key) &&
+      !forbiddenTopLevel.has(key) &&
+      !DEDICATED_TOP_LEVEL_FIELDS.has(key),
   );
   if (unknown.length === 0) {
     return ok("warn.unknown-top-level-fields", "unknown top-level fields", "no unknown top-level fields");

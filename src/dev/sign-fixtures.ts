@@ -13,7 +13,7 @@
  * `git diff --exit-code fixtures/` MUST be clean.
  *
  * It also refreshes the single removed-field discovery fixture from
- * `__fixture_rp_attestation_source` and regenerates the attestation-source
+ * `__fixture_removed_attestation_source` and regenerates the attestation-source
  * documents that carry a signed JWT (v1.3.0), so no checked-in JWS is ever
  * hand-edited.
  */
@@ -488,6 +488,27 @@ async function main(): Promise<void> {
     status: 200,
     body: validDomainJws,
   });
+  await writeJson(join(sourceDir, "wrong-content-type.json"), {
+    status: 200,
+    contentType: "text/plain",
+    body: { attestation: validDomainJws },
+  });
+  const untrustedJws = jwsByName.get("untrusted-broker.jwt");
+  if (untrustedJws === undefined) {
+    throw new Error("the untrusted-broker attestation fixture is missing");
+  }
+  await writeJson(join(sourceDir, "ok-broker-other-issuer.json"), {
+    status: 200,
+    body: { attestation: untrustedJws },
+  });
+  // A syntactically compact-JWS-shaped value over the 16 KiB source cap. It is
+  // deliberately not a real token: the source schema rejects it before JWT
+  // verification, which is what the oversize row proves.
+  const oversizeAttestation = `${"a".repeat(8200)}.${"b".repeat(8200)}.${"c".repeat(20)}`;
+  await writeJson(join(sourceDir, "oversize-source.json"), {
+    status: 200,
+    body: { attestation: oversizeAttestation },
+  });
 
   const receiptFiles: [string, string][] = [
     [
@@ -703,7 +724,7 @@ async function main(): Promise<void> {
     } catch {
       continue;
     }
-    const source = document.__fixture_rp_attestation_source;
+    const source = document.__fixture_removed_attestation_source;
     if (typeof source !== "string") {
       continue;
     }
@@ -720,8 +741,8 @@ async function main(): Promise<void> {
       `  receipts:     ${receiptFiles.length}`,
       `  status:       ${statusFiles.length}`,
       `  abuse:        ${abuseFiles.length}`,
-      "  attestation-source 200 responses: 5",
-      `  discovery documents refreshed from __fixture_rp_attestation_source: ${refreshed}`,
+      "  attestation-source 200 responses: 8",
+      `  discovery documents refreshed from __fixture_removed_attestation_source: ${refreshed}`,
       "  next: git diff --exit-code fixtures/",
     ].join("\n"),
   );

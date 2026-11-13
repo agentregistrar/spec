@@ -852,7 +852,25 @@ export async function verifyRpAttestationSource(
     context.sourceUri !== null &&
     result.status === "verified"
   ) {
-    const sourceOrigin = normalizeOrigin(new URL(context.sourceUri).origin);
+    let sourceOrigin: string | null;
+    try {
+      sourceOrigin = normalizeOrigin(new URL(context.sourceUri).origin);
+    } catch {
+      sourceOrigin = null;
+    }
+    if (sourceOrigin === null) {
+      result.checks.push({
+        id: "attestation.source_issuer",
+        status: "fail",
+        message: "the broker source URI is not a valid absolute URL, so iss binding cannot be checked",
+      });
+      return failWith(
+        result,
+        "invalid",
+        "source_uri_invalid",
+        "the broker source URI is not a valid absolute URL",
+      );
+    }
     if (normalizeOrigin(result.iss ?? "") !== sourceOrigin) {
       result.checks.push({
         id: "attestation.source_issuer",

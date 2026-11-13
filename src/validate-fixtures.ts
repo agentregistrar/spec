@@ -204,7 +204,11 @@ async function runDiscoveryCase(
         detail: `source response ${options.sourceResponse} must be { status, body }`,
       };
     }
-    sourceResponse = { status: raw.status, body: raw.body };
+    sourceResponse = {
+      status: raw.status,
+      body: raw.body,
+      ...(typeof raw.contentType === "string" ? { contentType: raw.contentType } : {}),
+    };
   }
   const result = await validateDiscoveryInput(path, {
     verifyAttestation: options.verifyAttestation ?? false,
@@ -285,6 +289,16 @@ function compareChecks(
     }
     if (typeof record.reason === "string" && check.reason !== record.reason) {
       problems.push(`check ${id}: expected reason ${record.reason}, got ${String(check.reason)}`);
+    }
+    const excludes = record.messageExcludes;
+    if (Array.isArray(excludes)) {
+      for (const needle of excludes) {
+        if (typeof needle === "string" && check.message.includes(needle)) {
+          problems.push(
+            `check ${id}: message must not contain ${JSON.stringify(needle)} (got ${check.message})`,
+          );
+        }
+      }
     }
   }
 }

@@ -1,5 +1,5 @@
 {
-  "$comment": "Expected results for the manual fixture harness (`pnpm validate:fixtures`). Regenerate JWS fixtures with `pnpm sign:fixtures`; this file is hand-maintained. A `crossFieldOnly: true` attestation row is valid under the closed JSON Schema but rejected by Zod for a cross-field rule JSON Schema cannot express (here: unique keys[].kid). Discovery rows may assert `checks` (check id -> status or {status, reason}), `failCheck`, `mode`, and `attestation.reason`; `sourceResponse` points at a `{ status, body }` fixture so no run needs a live broker or provider.",
+  "$comment": "Expected results for the manual fixture harness (`pnpm validate:fixtures`). Regenerate JWS fixtures with `pnpm sign:fixtures`; this file is hand-maintained. A `crossFieldOnly: true` attestation row is valid under the closed JSON Schema but rejected by Zod for a cross-field rule JSON Schema cannot express (here: unique keys[].kid). Discovery rows may assert `checks` (check id -> status or {status, reason, messageExcludes}), `failCheck`, `mode`, and `attestation.reason`; `sourceResponse` points at a `{ status, body, contentType? }` fixture so no run needs a live broker or provider.",
   "clock": "2026-10-24T00:00:00Z",
   "defaults": {
     "trustedBrokers": [
@@ -213,6 +213,104 @@
       }
     },
     {
+      "id": "discovery/invalid-attestation-uri-userinfo",
+      "kind": "discovery",
+      "path": "fixtures/invalid-attestation-uri-userinfo.json",
+      "options": {
+        "verifyAttestation": true
+      },
+      "expect": {
+        "exitCode": 1,
+        "conformance": false,
+        "evaluated": true,
+        "failCheck": "field.attestation.uri",
+        "checks": {
+          "field.attestation.uri": {
+            "status": "fail",
+            "reason": "attestation_uri_invalid"
+          },
+          "schema.json-schema": "pass"
+        }
+      }
+    },
+    {
+      "id": "discovery/invalid-attestation-uri-fragment",
+      "kind": "discovery",
+      "path": "fixtures/invalid-attestation-uri-fragment.json",
+      "options": {
+        "verifyAttestation": true
+      },
+      "expect": {
+        "exitCode": 1,
+        "conformance": false,
+        "evaluated": true,
+        "failCheck": "field.attestation.uri",
+        "checks": {
+          "field.attestation.uri": {
+            "status": "fail",
+            "reason": "attestation_uri_invalid"
+          },
+          "schema.json-schema": "pass"
+        }
+      }
+    },
+    {
+      "id": "discovery/provider-wrong-content-type",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-provider.json",
+      "options": {
+        "verifyAttestation": true,
+        "sourceResponse": "fixtures/attestation-sources/wrong-content-type.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "invalid",
+        "reason": "source_document_invalid",
+        "mode": "provider",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/broker-other-issuer",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-broker.json",
+      "options": {
+        "verifyAttestation": true,
+        "trustedBrokers": [
+          "https://rp-broker.example",
+          "https://other-broker.example"
+        ],
+        "jwks": "fixtures/keys/fixture-jwks-broker-2.json",
+        "sourceResponse": "fixtures/attestation-sources/ok-broker-other-issuer.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "invalid",
+        "reason": "attestation_issuer_mismatch",
+        "mode": "broker",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/provider-oversize-source",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-provider.json",
+      "options": {
+        "verifyAttestation": true,
+        "sourceResponse": "fixtures/attestation-sources/oversize-source.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "invalid",
+        "reason": "source_document_invalid",
+        "mode": "provider",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
       "id": "discovery/invalid-attestation-not-object",
       "kind": "discovery",
       "path": "fixtures/invalid-attestation-not-object.json",
@@ -297,7 +395,13 @@
             "status": "fail",
             "reason": "rp_attestation_removed"
           },
-          "schema.json-schema": "pass"
+          "schema.json-schema": "pass",
+          "warn.unknown-top-level-fields": {
+            "status": "warn",
+            "messageExcludes": [
+              "rp_attestation"
+            ]
+          }
         }
       }
     },
@@ -1070,6 +1174,16 @@
       "id": "source/ok-raw-jwt-body",
       "kind": "source",
       "path": "fixtures/attestation-sources/ok-raw-jwt-body.json",
+      "expect": {
+        "schema": false,
+        "zod": false,
+        "valid": false
+      }
+    },
+    {
+      "id": "source/oversize-source",
+      "kind": "source",
+      "path": "fixtures/attestation-sources/oversize-source.json",
       "expect": {
         "schema": false,
         "zod": false,
