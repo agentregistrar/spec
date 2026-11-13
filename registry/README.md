@@ -104,8 +104,8 @@ machine-readable file. Each entry's `validator_evidence` records the concrete co
 
 VaporCloud's `verification` object records broker `https://agentregistrar.dev`, level `domain`,
 attestation jti `rpa_01m5vggft4vn3x9bfw9wy6b8zn`, `checked_at` `2026-10-26T07:23:40.000Z`, and
-`status:"active"`. It is a **snapshot**, not a live status feed; the broker attestation in discovery
-is the live proof, and verification is identity, not safety or endorsement.
+`status:"active"`. It is a **snapshot**, not a live status feed; the attestation source named by
+discovery is the live proof, and verification is identity, not safety or endorsement.
 
 **Live origin.** VaporCloud's `discovery_url` and `validator_evidence.source` are both the public
 `https://skdl.dev/.well-known/agent-signup.json`; the recorded run was URL-mode from the public
@@ -203,7 +203,7 @@ the `<…>` placeholders once hosting exists. In-repo, the link targets are
 
 | Artifact | Location |
 | :--- | :--- |
-| Specification (`v1.2.0`) | [`../agent-identity-v1.md`](../agent-identity-v1.md) |
+| Specification (`v1.3.0`) | [`../agent-identity-v1.md`](../agent-identity-v1.md) |
 | Scope boundaries rulebook | [`../scope-boundaries.md`](../scope-boundaries.md) |
 | Conformance + attestation validator guide | [`../validator.md`](../validator.md) |
 | Registry schema | [`./implementations.schema.json`](./implementations.schema.json) |

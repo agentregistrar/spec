@@ -100,15 +100,17 @@ Removing vendor capabilities from the protocol **MUST NOT** remove these in-scop
 
 ## 6. Relying Party Identity Is Identity
 
-`v1.2.0` adds a second identity to the protocol: the relying party's own broker-issued identity. It
+`v1.2.0` added a second identity to the protocol: the relying party's own broker-issued identity. It
 belongs here for the same reason the agent's identity does — it proves **who** the counterparty is,
-not what they sell.
+not what they sell. `v1.3.0` moves only its discovery carrier to the optional `attestation` source
+object; the identity and the signed statement are unchanged.
 
 **In scope as protocol (RP identity):**
 
 - the provider account that owns an origin: registration, origin/audience proof, and RP signing keys
   with proof of possession;
-- the broker-issued RP attestation and its publication in the optional `rp_attestation` field;
+- the broker-issued RP attestation and its publication through the optional `attestation` source
+  object (`mode` `broker` or `provider`, stable source URI);
 - the provider API that issues and renews attestations (Contract H) and the broker metadata that
   advertises JWKS/status/abuse endpoints (Contract I);
 - RP-signed receipts and authenticated receipt ingestion;

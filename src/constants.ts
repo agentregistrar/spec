@@ -1,6 +1,6 @@
 /**
  * Frozen numeric bounds, patterns, and clock constants for `agent-identity-v1`
- * `v1.2.0` (Contracts G, I, E, D.2). These mirror the normative text in
+ * `v1.3.0` (Contracts G, I, E, D.2; unchanged from `v1.2.0`). These mirror the normative text in
  * `agent-identity-v1.md` §5 and are shared by the Zod schemas, the attestation
  * verifier, and the fixture harness so no two copies can drift.
  */

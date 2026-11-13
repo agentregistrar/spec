@@ -45,8 +45,10 @@ Required fields (`agent-identity-v1.md` §5.1): `protocol` (`"agent-identity-v1"
 `terms` (complete `text` + `version` + `url` + `sha256`), and `endpoints.agent_signup`.
 
 Optional fields (§5.2): `spec`, `provider_url`, `contact`, `updated_at`, non-capability `extensions`
-keyed by reverse-DNS namespace, and the optional `rp_attestation` compact JWS (§10 of this guide).
+keyed by reverse-DNS namespace, and the optional `attestation` source object (§10 of this guide).
 Nothing else. See the minimal example in §5.5 of the spec; do not copy vendor fields from older docs.
+The embedded `rp_attestation` field from `v1.2.0` is **removed**: a document that still contains it is
+non-conformant, and there is no compatibility field.
 
 ### Forbidden fields (§5.3)
 
@@ -208,8 +210,8 @@ JWKS) — an operational result with no conformance verdict (`DOCUMENT: NOT CHEC
 rejects vendor capability fields at any depth (including under `extensions`) and recomputes the ToS
 hash. A validator-passing document is the objective entry criterion for the implementation registry.
 
-Conformance and attestation verification are separate. Once you publish `rp_attestation`, verify it
-offline in CI against a pinned broker JWKS:
+Conformance and attestation verification are separate. Once you publish an `attestation` source by
+either mode, verify it offline in CI against a pinned broker JWKS:
 
 ```bash
 pnpm --silent validate:discovery https://your-service.example/.well-known/agent-signup.json \
@@ -219,15 +221,34 @@ pnpm --silent validate:discovery https://your-service.example/.well-known/agent-
 ```
 
 `--trusted-rp-broker` is configuration, never inferred from the document. Without
-`--require-attestation`, an `unverified`/`expired`/`invalid` attestation is a warning and the
-conformance verdict still passes; with it, anything but `verified` fails (and `unavailable` exits
-`2`).
+`--require-attestation`, an `unverified`/`expired`/`invalid`/`suspended` attestation is a warning and
+the conformance verdict still passes; with it, anything but `verified` fails (and `unavailable` exits
+`2`). A typed broker `403`/`404`/`410` is a verification result, not a conformance failure: a
+suspended, unknown, or revoked state does not make your discovery document non-conformant.
 
-The validator is the source-first package `@agentregistrar/discovery` (`1.2.0`, **Apache-2.0**).
-The `v1.2.0` tag publishes it to npm; until that tag exists `npm dist-tags.latest` is `1.1.0`, so run
-it from a clone of this specification repository, or after the tag exists use the pinned git
-dependency (`github:agentregistrar/spec#v1.2.0`). There is no `bin` entry — always invoke it with
-`pnpm validate:discovery`.
+The validator is the source-first package `@agentregistrar/discovery` (`1.3.0`, **Apache-2.0**). Run it
+from a clone of this specification repository, or use the pinned git dependency
+(`github:agentregistrar/spec#v1.3.0`) once the tag exists. There is no `bin` entry — always invoke it
+with `pnpm validate:discovery`.
+
+To test both modes without a live broker, use the checked-in fixtures and the fixture-only
+`--source-response` flag (it injects a local `{ status, body, contentType? }` instead of fetching):
+
+```bash
+pnpm validate:discovery fixtures/valid-attestation-broker.json \
+  --verify-attestation --require-attestation \
+  --trusted-rp-broker https://rp-broker.example \
+  --jwks fixtures/keys/fixture-jwks-broker-1.json \
+  --source-response fixtures/attestation-sources/ok-broker.json \
+  --at 2026-10-24T00:00:00Z --json
+
+pnpm validate:discovery fixtures/valid-attestation-provider.json \
+  --verify-attestation --require-attestation \
+  --trusted-rp-broker https://rp-broker.example \
+  --jwks fixtures/keys/fixture-jwks-broker-1.json \
+  --source-response fixtures/attestation-sources/ok-provider.json \
+  --at 2026-10-24T00:00:00Z --json
+```
 
 Optionally, non-destructively probe your assertion issuers/endpoint:
 
@@ -244,9 +265,9 @@ under `--verify-attestation`.
 
 ## 8. Adoption / registry conventions
 
-The specification release **`v1.2.0`** is targeted for **2026-10-24** — see
-[`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md). This branch is the reviewed artifact, not the
-publication: the tag and npm release follow the merge. Earlier releases: **`v1.1.0`**
+The specification release **`v1.3.0`** is the breaking discovery-carrier release (2026-11-13) — see
+[`release-notes-v1.3.0.md`](./release-notes-v1.3.0.md). Earlier releases: **`v1.2.0`** (2026-10-24,
+[`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md)), **`v1.1.0`**
 (2026-10-18, [`release-notes-v1.1.0.md`](./release-notes-v1.1.0.md)) and the initial **`v1.0.0`**
 (2026-10-17, [`release-notes-v1.0.0.md`](./release-notes-v1.0.0.md)). The adoption surface is
 published in
@@ -297,17 +318,75 @@ scoped, hashed at rest, and never sign receipts or abuse reports.
 
 ## 10. Publish and renew the attestation
 
-`POST /api/provider/v1/attestation` returns a compact JWS plus its metadata. Publish the JWS verbatim
-as `rp_attestation` in `/.well-known/agent-signup.json`.
+You choose one publication mode per origin/audience pair. **Broker-managed is the default** and needs
+no hosting or renewal work from you. **Provider-managed** is an advanced opt-in for providers that
+already run their own publication pipeline. There is no compatibility mode: the token is never
+embedded in discovery, and a document that still carries `rp_attestation` is non-conformant.
 
-- The attestation `rp.origin` must equal the origin serving discovery and `rp.audience` must equal
-  `audience`. Publishing a copy on another host does not move the binding.
-- `exp = iat + 86400`. Renew on a **12-hour target** so one missed cycle is tolerable. A renewal mints
-  a new `jti`; keep serving the current one and keep the previous one long enough to submit with any
-  receipt signed under it.
+```json
+{ "attestation": { "mode": "broker",   "uri": "https://your-broker.example/api/broker/provider-verification?origin=https%3A%2F%2Fyour-service.example&audience=your-service" } }
+{ "attestation": { "mode": "provider", "uri": "https://your-service.example/.well-known/agent-rp-attestation.json" } }
+```
+
+Both modes serve the **same** minimal source document, so consumers have one parsing path:
+
+```json
+{ "attestation": "<compact JWS>" }
+```
+
+`Content-Type: application/json`, additional fields ignored, and a raw JWT body is rejected. The JWS is
+the only trust anchor; do not put agent, human, or private data in the envelope.
+
+### 10.1 Broker-managed (default)
+
+The broker hosts and renews the token at a stable verification URL; your discovery points at that URL
+and nothing else.
+
+1. Choose broker-managed for the origin in the portal/provider API. The broker returns the full URI to
+   publish; copy it verbatim. It already carries `origin` and `audience` as query parameters.
+2. Publish `attestation: { mode: "broker", uri }` in discovery. The URI origin must be in your
+   `issuer_allowlist` (normally the same broker entry you already list).
+3. **No cron, no renewal job, no redeploy.** The broker renews on demand at the verification endpoint
+   when 12 hours or less remain, and never serves an expired token on a `200`. A provider with no
+   traffic for days gets a fresh token on the next lookup.
+4. Leave the URI unchanged across renewals. It is not a signed URL and does not carry a per-token
+   value; changing it breaks clients for no benefit.
+5. When the broker suspends or revokes the origin it answers with a typed error (`403`, `410`) and
+   never issues a new token. A client sees that within its five-minute positive cache bound.
+
+The endpoint's frozen shape is `GET /api/broker/provider-verification?origin=<origin>&audience=<audience>`.
+Never add parameters; never let an agent or human identifier reach it.
+
+### 10.2 Provider-managed (advanced opt-in)
+
+You host the source document and renew the token yourself through Contract H.
+
+1. Opt in to provider-managed for the origin and register the **stable** source URL. It must be HTTPS
+   (localhost development exception), with no userinfo and no fragment.
+2. The URL host must be the origin serving discovery or a **subdomain** of it. A third-party CDN host
+   is rejected by the validator and by conformant clients.
+3. Obtain or renew the token with `POST /api/provider/v1/attestation` (§15.3) and write the returned
+   `attestation` JWS into `{ "attestation": "<JWS>" }` at that URL, served as `application/json`.
+4. Renew on the **12-hour target** against the 24-hour expiry so one missed cycle is tolerable. Keep
+   serving the current token until you have the new one; never publish an empty or partial document.
+5. `rp.origin` must equal your discovery origin and `rp.audience` must equal `audience`; publishing a
+   copy on another host does not move the binding.
+6. Expiry is the **revocation bound** in this mode: a client accepts the token until `exp` plus skew,
+   so a broker suspension or revocation **may not be visible until the token expires**. Do not
+   describe provider-managed verification as instant revocation, and do not try to shorten it by
+   serving a different token to different clients.
+7. Cache-wise, a client may reuse a fetched source response for at most five minutes and never past
+   `exp`.
+
+### 10.3 Rules common to both modes
+
 - Do not put terms, scopes, endpoints, prices, or `provider_url` in the attestation. It is identity.
 - An expired attestation is `expired`, not `unverified`, and a `require` policy will refuse it. An
-  absent field is conformant and `unverified`.
+  absent `attestation` object is conformant and `unverified`.
+- A malformed `attestation` object, an invalid `uri`, or a URI on the wrong host is a **conformance**
+  failure: fix discovery, do not expect verification to explain it.
+- Keep the exact attestation a receipt was signed under. Contract F receipt ingestion still sends it
+  as the `rp_attestation` **body** field (§12) even though discovery no longer has that field.
 - If you operate a *broker* as well, serve `/.well-known/agent-broker.json` and the signed status
   endpoint described in `agent-identity-v1.md` §16.
 
@@ -360,10 +439,11 @@ See §5. The three rules implementers most often get wrong:
 { "signup_token": "<your compact receipt JWS>", "rp_attestation": "<the exact attestation JWS>" }
 ```
 
-Both fields are required; `signup_token` is the receipt. The broker verifies your attestation
-(including that its `iss` is trusted by that human or by the broker default), checks the receipt
-window against the attestation using the **signing** time, verifies your key and binding, resolves the
-assertion acceptance, and records `proof_source: "rp_callback"`.
+Both fields are required; `signup_token` is the receipt. The `rp_attestation` **body field is unchanged
+in `v1.3.0`** — it is not discovery, and the field name is historical. The broker verifies your
+attestation (including that its `iss` is trusted by that human or by the broker default), checks the
+receipt window against the attestation using the **signing** time, verifies your key and binding,
+resolves the assertion acceptance, and records `proof_source: "rp_callback"`.
 
 The MCP Tier 2 path (`identity_record_signup`) carries the same two values; if the agent omits the
 attestation, the broker fetches discovery at `service.origin` and requires the presented attestation's
@@ -411,7 +491,7 @@ To verify a **peer** RP attestation (for example before accepting a receipt or a
 3. Fetch/reuse `<iss>/.well-known/jwks.json` (or the metadata `jwks_uri`) and select the key by `kid`.
 4. Verify the signature, then `iat`/`exp` with 60 seconds of skew.
 5. Bind `rp.origin` to the origin you actually fetched, and `rp.audience` to `discovery.audience`.
-6. Record the level (`domain`/`entity`); both are `verified` for v1.2 policy.
+6. Record the level (`domain`/`entity`); both are `verified` for v1.3 policy.
 7. For a receipt, compare the receipt's signing time to the attestation window — not `now`.
 8. If you need a hard gate, consult the signed status endpoint; `revoked` maps to `invalid` with
    `reason: attestation_revoked`, and `suspended` maps to `suspended`.
@@ -433,6 +513,14 @@ Then apply your policy: `allow`/`warn` proceed (with a warning), `require` refus
 - Treating `terms.text` or your guide as instructions the Broker will execute (they are data).
 - Publishing an attestation whose `rp.origin` is `provider_url` or a redirect target rather than the
   origin that serves discovery.
+- Still embedding the attestation JWS in discovery as `rp_attestation` (removed in `v1.3.0`; the
+  document is non-conformant) instead of publishing `attestation: { mode, uri }`.
+- Pointing a `provider` source at a CDN or unrelated host instead of the discovery origin or a
+  subdomain of it.
+- Serving a raw JWT (or `{ "token": … }`) from `attestation.uri` instead of `{ "attestation": … }`
+  with `Content-Type: application/json`.
+- Treating a typed broker `403`/`404`/`410` as a conformance failure: it is a verification result, and
+  your document is still conformant.
 - Signing a receipt with a broker key, or with a key that is not the one named by
   `service.attestation_jti`/`service.key_id`.
 - Substituting your current attestation when submitting an older receipt.

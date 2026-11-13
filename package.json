@@ -1,7 +1,7 @@
 {
   "name": "@agentregistrar/discovery",
-  "version": "1.2.0",
-  "description": "Agent Identity v1 (agent-identity-v1) discovery, RP attestation, broker metadata and attestation-status schemas, plus the conformance and attestation validator",
+  "version": "1.3.0",
+  "description": "Agent Identity v1 (agent-identity-v1) discovery, attestation source, RP attestation, broker metadata and attestation-status schemas, plus the conformance and attestation-source validator",
   "license": "Apache-2.0",
   "private": false,
   "type": "module",

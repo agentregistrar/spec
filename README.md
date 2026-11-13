@@ -6,23 +6,25 @@ the JSON Schemas, the conformance/attestation fixtures, the validators, and the 
 registry.
 
 [Agent Registrar](https://agentregistrar.dev) is the protocol and brokerage service behind Agent
-Identity. A Relying Party (RP) publishes an identity-only discovery document and, optionally, a
-broker-issued attestation; an agent discovers it, verifies the RP locally, obtains a signed Agent
-Identity assertion from its broker, and signs up on behalf of a verified human owner — with no vendor
-catalog, provisioning, or resource surface in the protocol.
+Identity. A Relying Party (RP) publishes an identity-only discovery document that names an optional
+broker-issued attestation source; an agent discovers it, verifies the RP locally, obtains a signed
+Agent Identity assertion from its broker, and signs up on behalf of a verified human owner — with no
+vendor catalog, provisioning, or resource surface in the protocol.
 
 ## Contents
 
 | Path | Description |
 | :--- | :--- |
-| [`agent-identity-v1.md`](./agent-identity-v1.md) | Normative specification for `agent-identity-v1` (`v1.2.0`). |
+| [`agent-identity-v1.md`](./agent-identity-v1.md) | Normative specification for `agent-identity-v1` (`v1.3.0`). |
 | [`scope-boundaries.md`](./scope-boundaries.md) | Identity-vs-vendor scope rulebook, including RP identity, and the future-change checklist. |
-| [`implementing-agent-identity-v1.md`](./implementing-agent-identity-v1.md) | Relying Party implementation guide (provider identity, attestation, receipts, abuse). |
+| [`implementing-agent-identity-v1.md`](./implementing-agent-identity-v1.md) | Relying Party implementation guide (provider identity, attestation modes, receipts, abuse). |
 | [`validator.md`](./validator.md) | Conformance, attestation, fixture, and registry validator guide. |
-| [`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md) | Release notes for the `v1.2.0` release (this branch). |
+| [`release-notes-v1.3.0.md`](./release-notes-v1.3.0.md) | Release notes for the `v1.3.0` release (this branch). |
+| [`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md) | Release notes for `v1.2.0`. |
 | [`release-notes-v1.1.0.md`](./release-notes-v1.1.0.md) | Release notes for `v1.1.0`. |
 | [`release-notes-v1.0.0.md`](./release-notes-v1.0.0.md) | Release notes for `v1.0.0` (initial release). |
-| [`agent-signup.schema.json`](./agent-signup.schema.json) | JSON Schema for the discovery document (includes optional `rp_attestation`). |
+| [`agent-signup.schema.json`](./agent-signup.schema.json) | JSON Schema for the discovery document (includes the optional `attestation` source object; `rp_attestation` is rejected). |
+| [`attestation-source.schema.json`](./attestation-source.schema.json) | JSON Schema for the attestation source document `{ "attestation": "<compact JWS>" }`. |
 | [`rp-attestation.schema.json`](./rp-attestation.schema.json) | JSON Schema for Contract G attestation claims. |
 | [`broker-metadata.schema.json`](./broker-metadata.schema.json) | JSON Schema for Contract I broker metadata. |
 | [`attestation-status.schema.json`](./attestation-status.schema.json) | JSON Schema for Contract I attestation-status claims. |
@@ -52,12 +54,13 @@ pnpm --silent validate:discovery https://example.com/.well-known/agent-signup.js
 Attestation verification is opt-in, and conformance never requires the RP broker to be up:
 
 ```bash
-# Offline, deterministic attestation verification against a pinned per-issuer JWKS
-pnpm validate:discovery fixtures/valid-attested-domain.json \
-  --verify-attestation \
+# Offline, deterministic verification of a broker-managed source (pinned JWKS + injected response)
+pnpm validate:discovery fixtures/valid-attestation-broker.json \
+  --verify-attestation --require-attestation \
   --jwks fixtures/keys/fixture-jwks-broker-1.json \
   --trusted-rp-broker https://rp-broker.example \
-  --at 2026-10-24T00:00:00Z --require-attestation
+  --source-response fixtures/attestation-sources/ok-broker.json \
+  --at 2026-10-24T00:00:00Z
 
 # The standalone JWS/schema fixture matrix (manual harness, not a test framework)
 pnpm validate:fixtures
@@ -68,60 +71,68 @@ pnpm validate:registry registry/implementations.json --json
 
 The validator source is `src/validate-discovery.ts`; the checked-in fixtures live in
 [`fixtures/`](./fixtures). Exit codes: `0` valid / no required check failed, `1` conformance or
-required-verification failure (including unparseable JSON), `2` could not obtain what the run needed
-(document or JWKS) with no conformance verdict (`DOCUMENT: NOT CHECKED`). See the
-[validator guide](./validator.md) for the full flag and `--json` reference. Conformance and
-attestation verification are reported separately: a document can be **conformant and unverified**.
+required-verification failure (including unparseable JSON, a malformed `attestation` object, or a
+removed `rp_attestation` field), `2` could not obtain what the run needed (document, JWKS, or source)
+with no conformance verdict (`DOCUMENT: NOT CHECKED`). See the [validator guide](./validator.md) for
+the full flag and `--json` reference. Conformance and attestation verification are reported
+separately: a document can be **conformant and unverified**, and a typed broker failure is a
+verification result, never a conformance failure.
 
 ## Package
 
-`@agentregistrar/discovery` (**`1.2.0`**, **Apache-2.0**) is the self-contained package in this
+`@agentregistrar/discovery` (**`1.3.0`**, **Apache-2.0**) is the self-contained package in this
 repository. It has no private dependencies:
 
-- `src/schema.ts` — the canonical Zod schemas: `AgentSignupDiscoverySchema`, `RpAttestationClaimsSchema`,
+- `src/schema.ts` — the canonical Zod schemas: `AgentSignupDiscoverySchema`, `AttestationModeSchema`,
+  `AttestationSourceSchema`, `AttestationSourceDocumentSchema`, `RpAttestationClaimsSchema`,
   `RpAttestationKeySchema`, `RpAttestationHeaderSchema`, `AttestationStatusValueSchema`,
   `AttestationStatusClaimsSchema`, `AttestationStatusClaimsVerifierSchema`,
   `AttestationStatusResponseSchema`, `BrokerMetadataSchema`, plus the producer/verifier parsers
-  `parseRpAttestationProducer`, `parseRpAttestationVerifier`, and `parseAttestationStatusVerifier`.
-  `src/index.ts` re-exports them.
+  `parseRpAttestationProducer`, `parseRpAttestationVerifier`, `parseAttestationSourceDocument`, and
+  `parseAttestationStatusVerifier`. `src/index.ts` re-exports them.
 - `src/validate-discovery.ts` — the conformance + attestation validator CLI (`pnpm validate:discovery`).
 - `src/validate-fixtures.ts`, `src/validate-registry.ts` — manual harnesses (`pnpm validate:fixtures`,
   `pnpm validate:registry`). `src/dev/sign-fixtures.ts` regenerates the deterministic JWS fixtures
   (`pnpm sign:fixtures`).
-- `agent-signup.schema.json`, `rp-attestation.schema.json`, `broker-metadata.schema.json`,
-  `attestation-status.schema.json`, `signup-receipt.schema.json`, `abuse-report.schema.json`, and
-  `registry/implementations.schema.json` — the checked-in schemas, shipped so consumers and the
-  packaged validators work outside this repository.
+- `agent-signup.schema.json`, `attestation-source.schema.json`, `rp-attestation.schema.json`,
+  `broker-metadata.schema.json`, `attestation-status.schema.json`, `signup-receipt.schema.json`,
+  `abuse-report.schema.json`, and `registry/implementations.schema.json` — the checked-in schemas,
+  shipped so consumers and the packaged validators work outside this repository.
 
-The six protocol schemas and the registry schema are listed in `files` and exposed as `exports`
+The seven protocol schemas and the registry schema are listed in `files` and exposed as `exports`
 subpaths (for example `@agentregistrar/discovery/agent-signup.schema.json`). The package is
 **source-first**: the npm tarball ships the TypeScript sources (no build step). Consumers therefore
 need a toolchain that transpiles dependencies (for example Next.js `transpilePackages` or `tsx`).
-Install it from npm only after the `v1.2.0` tag is published — until then `npm dist-tags.latest` is
-`1.1.0` — or use the pinned git dependency (`github:agentregistrar/spec#v1.2.0`) once the tag exists.
-The package declares no `bin` entry — run the CLI with `pnpm validate:discovery`.
+Install it from npm, or use the pinned git dependency (`github:agentregistrar/spec#v1.3.0`) once the
+tag exists. The package declares no `bin` entry — run the CLI with `pnpm validate:discovery`.
 
 ### Releasing the package
 
 Publishing uses **npm trusted publishing (OIDC)** — no long-lived npm token. Bump `version` in
-`package.json`, merge to `main`, tag the merge commit `v1.2.0`, then run the `Publish package`
+`package.json`, merge to `main`, tag the merge commit `v1.3.0`, then run the `Publish package`
 workflow (`.github/workflows/publish.yml`, environment `npm-publish`) from `main`. Provenance is
 generated automatically. Never run a local `npm publish` and never use an npm token.
 
 ## Specification release
 
-`agent-identity-v1` **`v1.2.0`** is the two-sided-trust release, targeted for **2026-10-24**. This
-branch is the reviewed artifact, not the publication: the tag, npm publication, and GitHub release
-follow the merge (see the [release notes](./release-notes-v1.2.0.md) §6). Until the `v1.2.0` tag
-exists, `latest` on npm remains `1.1.0`. The release
-adds the broker-issued RP attestation (Contract G), the provider registration/status API (Contract H),
-broker metadata and signed attestation status (Contract I), the optional `rp_attestation` discovery
-field (D.1), authenticated abuse reporting (D.2), RP-signed receipts (E), authenticated receipt
-ingestion (F), and the trust model, assurance levels, verification rules, and status/error taxonomy.
+`agent-identity-v1` **`v1.3.0`** is the attestation-source release. This branch is the reviewed
+artifact, not the publication: the tag, npm publication, and GitHub release follow the merge (see the
+[release notes](./release-notes-v1.3.0.md)).
 
-`rp_attestation` is OPTIONAL and the wire protocol id stays `agent-identity-v1`: `v1.0.0` and
-`v1.1.0` documents remain conformant and are simply unverified. The former §14–§17 were renumbered
-§20–§23 so §1–§13 anchors stay stable. See the [v1.2.0 release notes](./release-notes-v1.2.0.md).
+**Breaking discovery change.** `v1.3.0` removes the embedded `rp_attestation` discovery field and
+replaces it with one OPTIONAL `attestation` object:
+
+```json
+{ "attestation": { "mode": "broker",   "uri": "https://broker.example/api/broker/provider-verification?origin=…&audience=…" } }
+{ "attestation": { "mode": "provider", "uri": "https://provider.example/.well-known/agent-rp-attestation.json" } }
+```
+
+The source at that URI serves `{ "attestation": "<compact JWS>" }` as `application/json`. Absence is
+conformant and unverified; a document that still contains `rp_attestation` is **non-conformant**, with
+no compatibility field, embedded fallback, or dual publication. The attestation JWT format, claims,
+signature, key snapshot, 24-hour lifetime, origin/audience binding, and the Contract F receipt/abuse
+bodies are **unchanged**. See the [v1.3.0 release notes](./release-notes-v1.3.0.md) for the migration
+steps.
 
 The previous **`v1.1.0`** (2026-10-18) and initial **`v1.0.0`** (2026-10-17) releases and the change
 process are recorded in their release notes.
@@ -137,6 +148,7 @@ generated from the released specification:
 - Validator guide: <https://docs.agentregistrar.dev/agent-identity/v1/validator/>
 - Changelog: <https://docs.agentregistrar.dev/agent-identity/v1/changelog/>
 - JSON Schema (discovery): <https://docs.agentregistrar.dev/agent-identity/v1/agent-signup.schema.json>
+- JSON Schema (attestation source): <https://docs.agentregistrar.dev/agent-identity/v1/attestation-source.schema.json>
 - JSON Schema (RP attestation): <https://docs.agentregistrar.dev/agent-identity/v1/rp-attestation.schema.json>
 - JSON Schema (broker metadata): <https://docs.agentregistrar.dev/agent-identity/v1/broker-metadata.schema.json>
 - JSON Schema (attestation status): <https://docs.agentregistrar.dev/agent-identity/v1/attestation-status.schema.json>
