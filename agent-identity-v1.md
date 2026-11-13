@@ -1,9 +1,9 @@
 # Agent Identity Relying Party Discovery v1 (`agent-signup.json`)
 
-- **Status:** Normative specification — `v1.3.0`. Maintained in [`agentregistrar/spec`](https://github.com/agentregistrar/spec).
+- **Status:** Normative specification — `v1.3.1`. Maintained in [`agentregistrar/spec`](https://github.com/agentregistrar/spec).
 - **Protocol identifier:** `agent-identity-v1`
 - **Well-known URI:** `GET /.well-known/agent-signup.json`
-- **Version:** `v1.3.0` (see §1.3)
+- **Version:** `v1.3.1` (see §1.3)
 - **Companion document:** [`scope-boundaries.md`](./scope-boundaries.md) — the identity-vs-vendor boundary and the future-change review checklist.
 
 This document is the single normative definition of the `agent-signup.json` discovery contract and the
@@ -39,6 +39,7 @@ scope.
 
 | Version | Date | Change |
 | :--- | :--- | :--- |
+| `v1.3.1` | 2026-11-13 | **Contract-text correction only.** Makes the published normative text match the D18 decisions that `v1.3.0` shipped without: Contract H attestation issuance is not plan-, billing-, or subscription-gated, and the client policy contract is `no_verify`/`verify`/`strict` with a separate `blocked` action and a `verify` default. No wire format, schema, validator behavior, fixture, or attestation claim changes. |
 | `v1.3.0` | 2026-11-13 | **Breaking discovery change.** The embedded `rp_attestation` field is removed and replaced by one OPTIONAL `attestation` object (`mode`: `broker` \| `provider`, `uri` naming a stable attestation source). A document that still carries `rp_attestation` is non-conformant; there is no compatibility field, embedded fallback, or dual publication. The attestation JWT, claims, signature, key snapshot, 24-hour lifetime, origin/audience binding, and the Contract F receipt/abuse bodies are unchanged. The wire protocol id stays `agent-identity-v1`. |
 | `v1.2.0` | 2026-10-24 | Adds Contracts G/H/I, optional `rp_attestation`, authenticated D.2, RP-signed E, authenticated F, the trust model, assurance levels, verification rules, and the status/error taxonomy. **The wire protocol id stays `agent-identity-v1`; `rp_attestation` is OPTIONAL and `v1.0.0`/`v1.1.0` documents remain conformant.** Superseded by `v1.3.0`, which removes `rp_attestation` from discovery: a `v1.2.0` document is no longer conformant. |
 | `v1.1.0` | 2026-10-18 | Additive clarifications: replay vs resolve (idempotent resolution, `assertion_replayed` reserved for conflicting reuse), the optional `resolution: "created" \| "resolved"` success field, acceptance lifetime, a knowledge-of-text restatement, recommended account identity keys (§9.1), and credential handoff & recovery (§12.5). **No field removals or renames; the wire protocol id stays `agent-identity-v1`; `v1.0.0` implementors remain conformant.** |
@@ -86,11 +87,21 @@ unchanged. There is no compatibility field: a document that still publishes `rp_
 non-conformant, and the validator reports `rp_attestation_removed`. Providers must republish discovery
 with the new object; see the release notes' migration steps.
 
+**Release record (`v1.3.1`).** `v1.3.1` is a **contract-text correction** patch on `v1.3.0`, shipped
+under `protocol` `agent-identity-v1` with **no** wire, schema, fixture, or validator-behavior change.
+It corrects two normative statements that `v1.3.0` omitted: Contract H attestation issuance is not
+plan-, billing-, or subscription-gated (§15.3, §15.4), and the client policy contract is
+`no_verify`/`verify`/`strict` with a separate `blocked` action, a `verify` default, and no `enforced`
+field (§17.2, §17.3, §18.3). It also aligns §19–§20, the implementation guide, the validator guide's
+policy-adjacent wording, and the scope rulebook with those decisions. The changed text describes the
+already-decided D18 contract; no attestation claim, discovery field, reason code, or check id changes.
+See [`release-notes-v1.3.1.md`](./release-notes-v1.3.1.md).
+
 ### 1.3 Version identity
 
 - The protocol version is carried **major-only** in the discovery document's `protocol` field:
   `agent-identity-v1`.
-- This specification revision is `v1.3.0`. Minor/patch revisions are additive and do not change
+- This specification revision is `v1.3.1`. Minor/patch revisions are additive and do not change
   the `protocol` value; breaking changes require a new `protocol` value and a new discovery path (§13).
   `v1.3.0` breaks the **discovery document** shape while the signup handshake and assertion/attestation
   wire formats stay `agent-identity-v1`: the removed `rp_attestation` field was OPTIONAL, its
@@ -138,7 +149,7 @@ verified, delegated, has accepted the vendor's ToS, and the signup event has bee
 - Relying Party identity: provider registration, origin/audience verification, RP signing keys, the
   broker-issued RP attestation, and its `attestation` source carrier (§5.2, §5.4, §14, §15).
 - Local attestation verification, the trusted-RP-broker trust list, assurance levels, and the
-  `allow`/`warn`/`require`/`block` policy (§17, §19).
+  `no_verify`/`verify`/`strict` policy plus the separate `blocked` action (§17, §19).
 - RP-signed receipts and authenticated receipt ingestion (§11.4, §11.6).
 - Authenticated abuse reporting and broker metadata discovery (§11.5, §16).
 
@@ -335,7 +346,7 @@ discovery document is a **parameter document, not a capability catalog**. A conf
 - When the discovery object was **supplied by the caller** rather than fetched by the broker, the
   caller **MUST** also supply an explicit canonical `rp_origin`; the verifier uses that declared
   origin and never infers it from `terms.url`, `provider_url`, or the attestation. This path is
-  recorded as `agent_supplied_discovery` and a `require` policy **MUST** reject it (§17).
+  recorded as `agent_supplied_discovery` and a `strict` policy **MUST** reject it (§17).
 - A verifier **MUST NOT** contact `attestation.uri` for a conformance verdict. Only an explicit
   verification request fetches it, and only after the mode and host binding pass (§19.2).
 
@@ -1017,8 +1028,8 @@ Verification is normative and ordered. Steps 1–2 are conformance; steps 3–11
     (`attestation_issuer_mismatch` otherwise): a broker URI may not serve a token issued by another
     origin. In `provider` mode the provider hosts the document, but the broker named by `iss` is still
     the issuer and is still checked against the trusted list in step 5.
-11. Record `rp.verification.level`. In v1.3 the level is informational for policy (the matrix is
-    level-agnostic) and is displayed in the ledger. A future `min_level` policy is additive.
+11. Record `rp.verification.level`. In v1.3 the level is informational for policy (the policy modes
+    are level-agnostic) and is displayed in the ledger. A future `min_level` policy is additive.
 
 A verifier **MUST NOT** treat a failed step 8 or 9 as "unverified". `unverified` means **no
 attestation source was published**, or a broker-managed lookup answered `404 attestation_not_found`
@@ -1031,7 +1042,7 @@ that fetched origin. When a caller supplies a discovery **object** instead (an a
 `identity_prove` path), the caller **MUST** also supply an explicit canonical `rp_origin`; the
 verifier uses that declared origin and never infers it from `terms.url`, `provider_url`, or the
 attestation itself. The declared origin is what a `provider` source URI is bound to (§14.2 step 2).
-The path is recorded as `agent_supplied_discovery` and a `require` policy **MUST** reject it with
+The path is recorded as `agent_supplied_discovery` and a `strict` policy **MUST** reject it with
 `discovery_source_not_allowed` (§17.3).
 
 ### 14.4 Attestation source
@@ -1219,13 +1230,16 @@ returns `201`:
   "attestation": "<compact JWS>" }
 ```
 
-Issuance requires provider `status:"active"`, `plan:"verified"` with a live subscription (the
-`verified` entitlement), origin `status:"verified"`, and at least one `active` key. A `free` provider
-is conformant but cannot issue an attestation; it receives `403 code:"provider_not_eligible"` with a
-plan/upgrade next step. A new `jti` is minted per issuance; `exp = iat + 86400`; `renewed_from_jti` is
-`null` on a first issuance and the previous `jti` on a renewal; there is no minimum renewal interval;
-the limit is 24 issuances/day/origin. `GET ?origin=&audience=` returns the latest attestation by
-`(issued_at desc, created_at desc, id desc)`, or `404 code:"attestation_not_found"`.
+Issuance requires provider `status:"active"`, origin `status:"verified"`, and at least one `active`
+key. Attestation is **not** gated on plan, billing, or subscription in v1.3: a `free` or otherwise
+unsubscribed provider that meets those conditions can issue and renew. A provider that is not
+`active`, an origin that is not `verified`, or a provider with no `active` key receives
+`403 code:"provider_not_eligible"`; in v1.3 `provider_not_eligible` reports those state failures, not
+a plan or upgrade requirement. A new `jti` is minted per issuance; `exp = iat + 86400`;
+`renewed_from_jti` is `null` on a first issuance and the previous `jti` on a renewal; there is no
+minimum renewal interval; the limit is 24 issuances/day/origin. `GET ?origin=&audience=` returns the
+latest attestation by `(issued_at desc, created_at desc, id desc)`, or `404
+code:"attestation_not_found"`.
 
 The normal renewal target is **12 hours** against a 24-hour expiry: one missed cycle is tolerable and
 expiry is the primary revocation bound.
@@ -1233,11 +1247,11 @@ expiry is the primary revocation bound.
 ### 15.4 Account lifecycle
 
 A new provider account is `pending`. The broker promotes it to `active` when its first origin becomes
-`verified` (domain level, automated). The `free` plan may be `active` but has no attestation
-entitlement. `verified` plans are set with a live subscription. An entity review is recorded before a
-`level:"entity"` attestation may be issued. Suspend, revoke, and restore are operator actions.
-`GET /api/provider/v1/account` remains readable in `pending`, `suspended`, and `revoked` so the
-provider can see its state; `provider_suspended` and `provider_not_eligible` apply to mutations and
+`verified` (domain level, automated). The `free` plan may be `active`; attestation issuance is not
+plan-gated (§15.3). `verified` plans are set with a live subscription. An entity review is recorded
+before a `level:"entity"` attestation may be issued. Suspend, revoke, and restore are operator
+actions. `GET /api/provider/v1/account` remains readable in `pending`, `suspended`, and `revoked` so
+the provider can see its state; `provider_suspended` and `provider_not_eligible` apply to mutations and
 issuance, not that read.
 
 ### 15.5 Errors
@@ -1333,7 +1347,7 @@ cached answer than 300 seconds except to report `unavailable`. An unknown `jti` 
 `Cache-Control: no-store`. Responses **MUST NOT** include provider name, contact, or account data.
 
 Local verification does **not** require the status endpoint: expiry is the primary bound. The status
-endpoint is opt-in defense-in-depth for enforced mode and operator actions.
+endpoint is opt-in defense-in-depth for `verify`/`strict` and operator actions.
 
 ---
 
@@ -1373,32 +1387,43 @@ Resolution is normative and follows this order:
 3. Validate protocol, terms, scopes, and issuer allowlist.
 4. Resolve and verify the attestation source if present (§14.2).
 5. Resolve trust: the broker default plus the human's override.
-6. Resolve policy: the human's rule for `(rp_origin, rp_audience)`, else `warn`.
+6. Resolve policy: the human's mode for `(rp_origin, rp_audience)`, else `verify`.
 7. Compute `RpVerificationStatus` (§18).
-8. Apply the policy matrix (§17.3).
+8. Apply the policy mode (§17.3).
 9. Mint and record the verification event.
 10. Return the prepared signup request and next steps.
 
-### 17.3 Policy matrix
+### 17.3 Policy modes
 
-`RpPolicy` is `allow`, `warn`, `require`, or `block`. Policy is **never** a verification status.
+`RpPolicy` is exactly `no_verify`, `verify`, or `strict`. Policy is **never** a verification status.
+The default is `verify`. The old `allow`/`warn`/`require`/`block` values are removed and there are no
+aliases. `blocked` is a **separate** per-relying-party boolean human action, not a policy mode.
 
 | Policy | `verified` | `unverified` | `attested_untrusted_broker` | `invalid` / `expired` | `unavailable` | `suspended` |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `allow` | proceed | proceed | proceed | proceed | proceed | proceed |
-| `warn` | proceed | proceed + warning | proceed + warning | proceed + warning | proceed + warning | proceed + warning |
-| `require` | proceed | `rp_unverified` | `rp_broker_untrusted` | `rp_attestation_invalid` / `rp_attestation_expired` | `rp_broker_unavailable` | `rp_suspended` |
-| `block` | `rp_blocked` | `rp_blocked` | `rp_blocked` | `rp_blocked` | `rp_blocked` | `rp_blocked` |
+| `no_verify` | proceed | proceed (shown as unverified) | proceed | proceed | proceed | proceed |
+| `verify` | proceed | `rp_unverified` | `rp_broker_untrusted` | `rp_attestation_invalid` / `rp_attestation_expired` | `rp_broker_unavailable` | `rp_suspended` |
+| `strict` | proceed (broker-managed only) | `rp_unverified` | `rp_broker_untrusted` | `rp_attestation_invalid` / `rp_attestation_expired` | `rp_broker_unavailable` | `rp_suspended` |
 
-- `require` is **always** broker-enforced. A `require` policy that is only advisory would be a lie.
-- `allow` and `warn` **MAY** set `enforced:true`: the broker still verifies the attestation at mint
-  time and records the verification row (and returns the warning), but the policy still proceeds.
-  `enforced:true` is **not** a hidden hard gate for `allow`/`warn`; only `require` refuses.
-- `require` **MUST** reject `source:"agent_supplied_discovery"` with `discovery_source_not_allowed`
-  and accept only a broker-fetched discovery document.
-- The default policy is `warn`. The trusted RP-broker list is the broker default plus the human's
-  `trust` override minus the human's `distrust` override; distrust wins. There is no per-agent list
-  in v1.2: agents inherit their human's policy.
+- `no_verify` requires no attestation and never turns a verification result into a refusal. An absent
+  source is shown as **unverified**; a present source is verified for display and recorded, but its
+  result does not gate the signup.
+- `verify` (the default) requires a valid attestation and accepts **either** publication mode. Every
+  status other than `verified` maps to the code in the table.
+- `strict` requires a valid **broker-managed** attestation. A provider-managed source is rejected with
+  `rp_attestation_mode_not_allowed` even when its token is otherwise valid; the status mapping is
+  otherwise the same as `verify`.
+- `verify` and `strict` are **always enforced**. There is no `enforced` field and no advisory variant:
+  a policy that only warned would be a lie. The removed `warn` mode has no replacement; choose
+  `no_verify` for "do not gate" or `verify`/`strict` for "gate".
+- `blocked = true` rejects the relying party with `rp_blocked` after discovery resolution but **before**
+  any attestation-source fetch, assertion, or signup, regardless of the policy mode and regardless of
+  any verification status or cached result. Clearing the block restores the human's mode.
+- `strict` **MUST** reject `source:"agent_supplied_discovery"` with `discovery_source_not_allowed` and
+  accept only a broker-fetched discovery document (§18.3).
+- The trusted RP-broker list is the broker default plus the human's `trust` override minus the human's
+  `distrust` override; distrust wins. There is no per-agent list in v1.3: agents inherit their human's
+  policy.
 
 This specification defines statuses, not MCP tool names or JSON-RPC envelopes.
 
@@ -1420,7 +1445,7 @@ conformance, so there was no source to fetch). It is never recorded as a verific
 | Condition | Status | Validator | MCP code |
 | :--- | :--- | :--- | :--- |
 | Valid attestation, trusted broker, source current | `verified` | `verified` | — |
-| No `attestation` object, or typed `404 attestation_not_found` | `unverified` | `unverified` | `rp_unverified` under `require` |
+| No `attestation` object, or typed `404 attestation_not_found` | `unverified` | `unverified` | `rp_unverified` under `verify`/`strict` |
 | Signature/claims/origin/audience failure, or typed `400`/`410` | `invalid` | `invalid` | `rp_attestation_invalid` |
 | Past `exp` + skew | `expired` | `expired` | `rp_attestation_expired` |
 | `iss` not in the trusted list | `attested_untrusted_broker` | `attested_untrusted_broker` | `rp_broker_untrusted` |
@@ -1428,9 +1453,10 @@ conformance, so there was no source to fetch). It is never recorded as a verific
 | Typed broker `403 provider_suspended`, or local provider suspended | `suspended` | `suspended` | `rp_suspended` |
 
 `unverified` means "no attestation source presented" (or the broker says none exists). An expired,
-invalid, untrusted, or suspended attestation is never downgraded to `unverified`. `blocked` is policy,
-not a verification result. The validator emits `suspended` for a broker-managed typed `403`; it never
-calls the signed status endpoint (§16.2) and never invents a suspension it did not receive.
+invalid, untrusted, or suspended attestation is never downgraded to `unverified`. `blocked` is a
+separate human action, not a policy mode and not a verification result. The validator emits `suspended`
+for a broker-managed typed `403`; it never calls the signed status endpoint (§16.2) and never invents a
+suspension it did not receive.
 
 ### 18.2 Proof sources
 
@@ -1449,9 +1475,9 @@ Only `rp_callback` and `rp_signed`, with a verified attestation, can give an abu
   `rp_origin` (the advanced `identity_prove` path; §5.4, §14.3). The declared origin is used and is
   never inferred from `terms.url`, `provider_url`, or the attestation.
 
-`require` is broker-enforced and **MUST** reject `agent_supplied_discovery` with
+`strict` is broker-enforced for source policy and **MUST** reject `agent_supplied_discovery` with
 `discovery_source_not_allowed`; only a broker-fetched discovery document is acceptable (§17.2,
-§17.3). `allow` and `warn` may accept either source, and a same-audience `require` row on another
+§17.3). `verify` and `no_verify` may accept either source, and a same-audience `strict` row on another
 origin also refuses a request with no source. `RpVerificationSource` is recorded with the
 `rp_verifications` event; it is not a verification status and never replaces `proof_source`.
 
@@ -1497,7 +1523,7 @@ Document **conformance** and attestation **verification** are separate outcomes:
   `attestation_revoked`, `429`/`5xx` are `unavailable`, and `400` is `invalid`.
 - An expired attestation is a verification result (`expired`); a bad signature, origin mismatch, or
   audience mismatch is `invalid`.
-- An unreachable or malformed source is `unavailable` or `invalid` — a warning by default, never a
+- An unreachable or malformed source is `unavailable` or `invalid` — a verification result, never a
   conformance failure.
 - A file-mode run with no fetch origin reports the `provider` host binding as **unchecked**
   (`attestation_binding_unchecked`) and the attestation as `unavailable` with reason
@@ -1601,8 +1627,9 @@ names.
 
 ### 19.8 Fail closed
 
-`require` and `--require-attestation` fail on `unavailable`. `warn` is advisory and never claims to be
-a control. A missing origin for the attestation binding makes verification `unavailable`; it never
+`verify` and `strict` fail on `unavailable`, and `--require-attestation` does the same for the
+validator. `no_verify` never turns a verification result into a refusal and never claims to be a
+control. A missing origin for the attestation binding makes verification `unavailable`; it never
 silently produces `verified`. A source URI that fails its mode host binding is never fetched; the run
 fails conformance instead. A verifier **MUST NOT** fall back to a token found anywhere else in the
 document, in `extensions`, or in a cached copy from another origin.
@@ -1648,10 +1675,12 @@ document, in `extensions`, or in a cached copy from another origin.
 - **RP key compromise and rotation:** receipts remain verifiable across rotation because the broker
   retains retired attestation-signing keys for at least 30 days after the last attestation they signed
   expires, and the verifier checks the receipt against the attestation it names, not the current one.
-- **No broker in the signup path:** local attestation verification is the default. Enforced mode
-  verifies at minting time; there is no per-signup A→B call and no tracking oracle.
+- **No broker in the signup path:** local attestation verification is the default. `verify` and
+  `strict` are enforced at minting time; `no_verify` never gates. There is no per-signup A→B call and
+  no tracking oracle.
 - **Verification is identity, not safety:** neither assurance level (`domain`, `entity`) asserts
-  safety, uptime, solvency, or conduct. `warn` is advisory; `require` is a hard gate; `block` never
+  safety, uptime, solvency, or conduct. `no_verify` is permissive; `verify` is the default gate for a
+  valid attestation in either mode; `strict` additionally requires broker-managed; `blocked` never
   proceeds.
 - **Fixture credentials:** the checked-in fixture signing seed is a warning-marked test vector. It is
   not a credential, is never referenced by broker configuration, and signs nothing outside

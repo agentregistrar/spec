@@ -1,10 +1,10 @@
 # Discovery Conformance and Attestation Validator (`agent-identity-v1`)
 
 - **Source:** `src/validate-discovery.ts` — run with `pnpm validate:discovery`.
-- **Package:** `@agentregistrar/discovery` `1.3.0`, licensed **Apache-2.0**. It is self-contained and
-  source-first: `pnpm install` from a clean clone, then run the CLI. The `v1.3.0` tag publishes it to
+- **Package:** `@agentregistrar/discovery` `1.3.1`, licensed **Apache-2.0**. It is self-contained and
+  source-first: `pnpm install` from a clean clone, then run the CLI. The `v1.3.1` tag publishes it to
   npm. Run it from this repository, or after the tag exists use the pinned git dependency
-  (`github:agentregistrar/spec#v1.3.0`). There is no `bin` entry — invoke it with
+  (`github:agentregistrar/spec#v1.3.1`). There is no `bin` entry — invoke it with
   `pnpm validate:discovery`.
 - **Normative references:** [`agent-identity-v1.md`](./agent-identity-v1.md),
   [`scope-boundaries.md`](./scope-boundaries.md).
@@ -197,7 +197,7 @@ Exit status is the contract; the JSON is evidence. The v1.3.0 additions:
 ```json
 {
   "validator": "agent-identity-v1",
-  "validatorVersion": "1.3.0",
+  "validatorVersion": "1.3.1",
   "valid": true,
   "exitCode": 0,
   "conformance": { "valid": true, "evaluated": true, "errors": [], "warnings": [] },
@@ -403,7 +403,7 @@ unparseable. `--json` emits `{valid, exitCode, errors, warnings}`.
 | Field | Type | Notes |
 | :--- | :--- | :--- |
 | `validator` | string | Always `"agent-identity-v1"`. |
-| `validatorVersion` | string | The `VALIDATOR_VERSION` constant, `"1.3.0"`. |
+| `validatorVersion` | string | The `VALIDATOR_VERSION` constant, `"1.3.1"`. |
 | `mode` | `"file"` \| `"url"` | How the document was obtained. |
 | `source` | string | The path or URL that was validated. |
 | `valid` | boolean | `true` iff `exitCode === 0` (the run result). |

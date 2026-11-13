@@ -33,7 +33,7 @@ to the vendor, documented in a post-signup context guide — never in discovery 
 | Abuse reporting and universal revocation | Contract D.2, kill switch |
 | Post-signup context pointer (identity-adjacent) | opaque `context.url` + `context.sha256` |
 | Relying Party identity | provider account, origin/audience verification, RP signing keys, broker-issued attestation, RP-signed receipts, authenticated abuse identity |
-| RP trust policy | trusted RP-broker list, per-RP `allow`/`warn`/`require`/`block`, assurance level display |
+| RP trust policy | trusted RP-broker list, per-RP `no_verify`/`verify`/`strict` mode plus the separate `blocked` action, assurance level display |
 
 ### 2.2 Out of scope (vendor responsibility)
 
@@ -143,8 +143,8 @@ In addition to §7, every proposed RP-identity change **MUST** answer:
 - [ ] Does it avoid creating a second trust root or an implicit "verified means safe" claim?
 - [ ] Does it keep the human kill switch (`revoked`) distinct from operator protective action
       (`suspended`)?
-- [ ] Does it keep local verification the default, with enforcement opt-in for `allow`/`warn` and
-      mandatory only for `require`?
+- [ ] Does it keep local verification the default (`verify`), with `no_verify` as the permissive
+      choice and `verify`/`strict` as the enforced choices (no advisory enforcement field)?
 
 ## 7. Future-Change Review Checklist
 

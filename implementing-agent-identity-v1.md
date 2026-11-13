@@ -226,9 +226,9 @@ the conformance verdict still passes; with it, anything but `verified` fails (an
 `2`). A typed broker `403`/`404`/`410` is a verification result, not a conformance failure: a
 suspended, unknown, or revoked state does not make your discovery document non-conformant.
 
-The validator is the source-first package `@agentregistrar/discovery` (`1.3.0`, **Apache-2.0**). Run it
+The validator is the source-first package `@agentregistrar/discovery` (`1.3.1`, **Apache-2.0**). Run it
 from a clone of this specification repository, or use the pinned git dependency
-(`github:agentregistrar/spec#v1.3.0`) once the tag exists. There is no `bin` entry — always invoke it
+(`github:agentregistrar/spec#v1.3.1`) once the tag exists. There is no `bin` entry — always invoke it
 with `pnpm validate:discovery`.
 
 To test both modes without a live broker, use the checked-in fixtures and the fixture-only
@@ -265,8 +265,9 @@ under `--verify-attestation`.
 
 ## 8. Adoption / registry conventions
 
-The specification release **`v1.3.0`** is the breaking discovery-carrier release (2026-11-13) — see
-[`release-notes-v1.3.0.md`](./release-notes-v1.3.0.md). Earlier releases: **`v1.2.0`** (2026-10-24,
+The current specification release is **`v1.3.1`** (2026-11-13), a contract-text patch on **`v1.3.0`**,
+the breaking discovery-carrier release — see [`release-notes-v1.3.1.md`](./release-notes-v1.3.1.md)
+and [`release-notes-v1.3.0.md`](./release-notes-v1.3.0.md). Earlier releases: **`v1.2.0`** (2026-10-24,
 [`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md)), **`v1.1.0`**
 (2026-10-18, [`release-notes-v1.1.0.md`](./release-notes-v1.1.0.md)) and the initial **`v1.0.0`**
 (2026-10-17, [`release-notes-v1.0.0.md`](./release-notes-v1.0.0.md)). The adoption surface is
@@ -381,8 +382,8 @@ You host the source document and renew the token yourself through Contract H.
 ### 10.3 Rules common to both modes
 
 - Do not put terms, scopes, endpoints, prices, or `provider_url` in the attestation. It is identity.
-- An expired attestation is `expired`, not `unverified`, and a `require` policy will refuse it. An
-  absent `attestation` object is conformant and `unverified`.
+- An expired attestation is `expired`, not `unverified`, and a `verify` or `strict` policy will refuse
+  it. An absent `attestation` object is conformant and `unverified`.
 - A malformed `attestation` object, an invalid `uri`, or a URI on the wrong host is a **conformance**
   failure: fix discovery, do not expect verification to explain it.
 - Keep the exact attestation a receipt was signed under. Contract F receipt ingestion still sends it
@@ -496,8 +497,10 @@ To verify a **peer** RP attestation (for example before accepting a receipt or a
 8. If you need a hard gate, consult the signed status endpoint; `revoked` maps to `invalid` with
    `reason: attestation_revoked`, and `suspended` maps to `suspended`.
 
-Then apply your policy: `allow`/`warn` proceed (with a warning), `require` refuses anything but
-`verified`, and `block` never proceeds.
+Then apply your policy mode: `no_verify` requires no attestation and never gates; `verify` (the
+default) requires `verified` and accepts either publication mode; `strict` requires `verified` **and**
+broker-managed mode. `blocked` is a separate human action, not a mode, and rejects the RP with
+`rp_blocked` before any source fetch.
 
 ---
 

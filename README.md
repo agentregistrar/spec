@@ -15,11 +15,12 @@ vendor catalog, provisioning, or resource surface in the protocol.
 
 | Path | Description |
 | :--- | :--- |
-| [`agent-identity-v1.md`](./agent-identity-v1.md) | Normative specification for `agent-identity-v1` (`v1.3.0`). |
+| [`agent-identity-v1.md`](./agent-identity-v1.md) | Normative specification for `agent-identity-v1` (`v1.3.1`). |
 | [`scope-boundaries.md`](./scope-boundaries.md) | Identity-vs-vendor scope rulebook, including RP identity, and the future-change checklist. |
 | [`implementing-agent-identity-v1.md`](./implementing-agent-identity-v1.md) | Relying Party implementation guide (provider identity, attestation modes, receipts, abuse). |
 | [`validator.md`](./validator.md) | Conformance, attestation, fixture, and registry validator guide. |
-| [`release-notes-v1.3.0.md`](./release-notes-v1.3.0.md) | Release notes for the `v1.3.0` release (this branch). |
+| [`release-notes-v1.3.1.md`](./release-notes-v1.3.1.md) | Release notes for the `v1.3.1` contract-text patch (this branch). |
+| [`release-notes-v1.3.0.md`](./release-notes-v1.3.0.md) | Release notes for the `v1.3.0` release. |
 | [`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md) | Release notes for `v1.2.0`. |
 | [`release-notes-v1.1.0.md`](./release-notes-v1.1.0.md) | Release notes for `v1.1.0`. |
 | [`release-notes-v1.0.0.md`](./release-notes-v1.0.0.md) | Release notes for `v1.0.0` (initial release). |
@@ -80,7 +81,7 @@ verification result, never a conformance failure.
 
 ## Package
 
-`@agentregistrar/discovery` (**`1.3.0`**, **Apache-2.0**) is the self-contained package in this
+`@agentregistrar/discovery` (**`1.3.1`**, **Apache-2.0**) is the self-contained package in this
 repository. It has no private dependencies:
 
 - `src/schema.ts` — the canonical Zod schemas: `AgentSignupDiscoverySchema`, `AttestationModeSchema`,
@@ -103,24 +104,32 @@ The seven protocol schemas and the registry schema are listed in `files` and exp
 subpaths (for example `@agentregistrar/discovery/agent-signup.schema.json`). The package is
 **source-first**: the npm tarball ships the TypeScript sources (no build step). Consumers therefore
 need a toolchain that transpiles dependencies (for example Next.js `transpilePackages` or `tsx`).
-Install it from npm, or use the pinned git dependency (`github:agentregistrar/spec#v1.3.0`) once the
+Install it from npm, or use the pinned git dependency (`github:agentregistrar/spec#v1.3.1`) once the
 tag exists. The package declares no `bin` entry — run the CLI with `pnpm validate:discovery`.
 
 ### Releasing the package
 
 Publishing uses **npm trusted publishing (OIDC)** — no long-lived npm token. Bump `version` in
-`package.json`, merge to `main`, tag the merge commit `v1.3.0`, then run the `Publish package`
+`package.json`, merge to `main`, tag the merge commit `v1.3.1`, then run the `Publish package`
 workflow (`.github/workflows/publish.yml`, environment `npm-publish`) from `main`. Provenance is
 generated automatically. Never run a local `npm publish` and never use an npm token.
 
 ## Specification release
 
-`agent-identity-v1` **`v1.3.0`** is the attestation-source release. This branch is the reviewed
-artifact, not the publication: the tag, npm publication, and GitHub release follow the merge (see the
-[release notes](./release-notes-v1.3.0.md)).
+`agent-identity-v1` **`v1.3.1`** is a **contract-text correction** patch on the `v1.3.0`
+attestation-source release. It changes no wire format, JSON Schema, fixture, validator behavior, or
+attestation claim; it corrects normative text that `v1.3.0` shipped without the decided D18 contract:
 
-**Breaking discovery change.** `v1.3.0` removes the embedded `rp_attestation` discovery field and
-replaces it with one OPTIONAL `attestation` object:
+- Contract H attestation issuance is **not** plan-, billing-, or subscription-gated (§15.3, §15.4).
+- The client policy contract is exactly `no_verify`/`verify`/`strict` with a `verify` default and a
+  separate `blocked` human action; there is no `enforced` field and no `allow`/`warn`/`require`/`block`
+  vocabulary (§17.2, §17.3, §18.3).
+
+See the [v1.3.1 release notes](./release-notes-v1.3.1.md) for why the correction shipped as a patch
+rather than a rewrite of `1.3.0`.
+
+**`v1.3.0` breaking discovery change.** `v1.3.0` removes the embedded `rp_attestation` discovery field
+and replaces it with one OPTIONAL `attestation` object:
 
 ```json
 { "attestation": { "mode": "broker",   "uri": "https://broker.example/api/broker/provider-verification?origin=…&audience=…" } }
