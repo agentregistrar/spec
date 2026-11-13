@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://docs.agentregistrar.dev/agent-identity/v1/agent-signup.schema.json",
   "title": "Agent Identity Relying Party Discovery v1 (agent-signup.json)",
-  "description": "Identity-only v1 discovery document served at GET /.well-known/agent-signup.json. It is a parameter document, not a capability catalog: vendor capability surface (instance_catalog, endpoints.provision, endpoints.email_signup, endpoints.verify_otp, endpoints.broker_signup_receipt, SKUs/pricing/resource metadata) is forbidden and rejected. Unknown additive identity fields and namespaced `extensions` metadata are allowed and preserved. Normative definition: agent-identity-v1.md. Kept in lockstep with `AgentSignupDiscoverySchema` in this package (Zod is the source of truth).",
+  "description": "Identity-only v1 discovery document served at GET /.well-known/agent-signup.json. It is a parameter document, not a capability catalog: vendor capability surface (instance_catalog, endpoints.provision, endpoints.email_signup, endpoints.verify_otp, endpoints.broker_signup_receipt, SKUs/pricing/resource metadata) is forbidden and rejected. The v1.2 embedded `rp_attestation` carrier is removed and rejected; v1.3 publishes one optional `attestation` source object instead. Unknown additive identity fields and namespaced `extensions` metadata are allowed and preserved. Normative definition: agent-identity-v1.md. Kept in lockstep with `AgentSignupDiscoverySchema` in this package (Zod is the source of truth).",
   "type": "object",
   "required": [
     "protocol",
