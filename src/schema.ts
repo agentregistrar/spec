@@ -167,6 +167,55 @@ const contact = z
   });
 
 /**
+ * Absolute attestation-source URL: `https://` everywhere, with the documented
+ * `http://localhost` / `http://127.0.0.1` development exception. The URL MUST
+ * NOT carry userinfo or a fragment (spec §5.4; ledger §3.1). The URI is stable
+ * across token renewal and is not a signed URL.
+ */
+function isAttestationSourceUri(value: string): boolean {
+  if (/\s/.test(value)) {
+    return false;
+  }
+  const url = parseAbsoluteHttpUrl(value);
+  if (url === null) {
+    return false;
+  }
+  if (url.username !== "" || url.password !== "") {
+    return false;
+  }
+  if (url.hash !== "") {
+    return false;
+  }
+  return url.protocol === "https:" || isDevelopmentOrigin(url);
+}
+
+/** Absolute attestation-source URL (HTTPS, localhost dev exception, no userinfo/fragment). */
+const attestationSourceUri = z
+  .string()
+  .min(1)
+  .refine(isAttestationSourceUri, {
+    message:
+      "must be an absolute HTTPS URL with no userinfo or fragment (http://localhost / http://127.0.0.1 is the development exception)",
+  });
+
+/** Publication mode: `broker` or `provider` (ledger §3.1). No aliases. */
+export const AttestationModeSchema = z.enum(["broker", "provider"]);
+export type AttestationMode = z.infer<typeof AttestationModeSchema>;
+
+/**
+ * The discovery `attestation` object (spec §5.4). Closed: `mode` and `uri` are
+ * the complete vocabulary, so an additive field cannot silently change how a
+ * client selects a source.
+ */
+export const AttestationSourceSchema = z
+  .object({
+    mode: AttestationModeSchema,
+    uri: attestationSourceUri,
+  })
+  .strict();
+export type AttestationSource = z.infer<typeof AttestationSourceSchema>;
+
+/**
  * Strict RFC 3339 / ISO 8601 date-time for human/debuggability (spec §5.2).
  * `offset: true` accepts an explicit `Z` or numeric offset and rejects bare
  * dates and implementation-specific strings that `Date.parse` would accept, so
@@ -185,9 +234,10 @@ const iso8601Timestamp = z
  *
  * The removed vendor fields (`instance_catalog`, `endpoints.provision`,
  * `endpoints.email_signup`, `endpoints.verify_otp`, and
- * `endpoints.broker_signup_receipt`) are declared as `z.never()` so the schema
- * *rejects* them, while genuinely unknown additive identity fields and
- * `extensions` data are allowed and preserved.
+ * `endpoints.broker_signup_receipt`) and the removed v1.2 attestation carrier
+ * (`rp_attestation`) are declared as `z.never()` so the schema *rejects* them,
+ * while genuinely unknown additive identity fields and `extensions` data are
+ * allowed and preserved.
  */
 export const AgentSignupDiscoverySchema = z
   .object({
@@ -196,19 +246,13 @@ export const AgentSignupDiscoverySchema = z
     audience,
     provider_name: z.string().min(1),
 
-    // Contract G carrier (spec §5.3): an OPTIONAL compact JWS. Presence changes
-    // no other field; absence is conformant and means "unverified".
-    rp_attestation: z
-      .string()
-      .max(
-        ATTESTATION_FIELD_MAX_LENGTH,
-        `rp_attestation must be at most ${ATTESTATION_FIELD_MAX_LENGTH} characters`,
-      )
-      .regex(
-        COMPACT_JWS_PATTERN,
-        "rp_attestation must be a compact JWS: three base64url segments separated by `.`",
-      )
-      .optional(),
+    // v1.3 attestation publication (spec §5.4): one OPTIONAL source object.
+    // Absence is conformant and means "unverified".
+    attestation: AttestationSourceSchema.optional(),
+
+    // Removed in v1.3.0: the embedded carrier is a conformance error, with no
+    // dual publication, embedded fallback, or compatibility mode.
+    rp_attestation: z.never().optional(),
 
     // Optional identity metadata.
     spec: absoluteProtocolUrl.optional(),
@@ -276,6 +320,47 @@ export const AgentSignupDiscoverySchema = z
   .passthrough();
 
 export type AgentSignupDiscovery = z.infer<typeof AgentSignupDiscoverySchema>;
+
+// ===========================================================================
+// Attestation publication (v1.3.0; spec §5.4, §14)
+// ===========================================================================
+//
+// Discovery carries one optional `attestation` source object. The token format
+// (Contract G) does not change; only where the client fetches it changes.
+// `broker` mode points at the broker's stable verification route; `provider`
+// mode points at a provider-hosted copy. Both serve the same minimal source
+// document, `{ "attestation": "<compact JWS>" }`.
+
+/**
+ * The attestation source document served by both modes (F1, frozen
+ * 2026-11-10): `{ "attestation": "<compact JWS>" }` with
+ * `Content-Type: application/json`. Additional fields are ignored; a raw JWT
+ * body is not accepted.
+ */
+export const AttestationSourceDocumentSchema = z
+  .object({
+    attestation: z
+      .string()
+      .min(5)
+      .max(
+        ATTESTATION_FIELD_MAX_LENGTH,
+        `attestation must be at most ${ATTESTATION_FIELD_MAX_LENGTH} characters`,
+      )
+      .regex(
+        COMPACT_JWS_PATTERN,
+        "attestation must be a compact JWS: three base64url segments separated by `.`",
+      ),
+  })
+  .passthrough();
+export type AttestationSourceDocument = z.infer<typeof AttestationSourceDocumentSchema>;
+
+/**
+ * Strict producer parser for the source document. Throws `ZodError` when the
+ * document is not exactly `{ attestation: <compact JWS> }` plus additive fields.
+ */
+export function parseAttestationSourceDocument(value: unknown): AttestationSourceDocument {
+  return AttestationSourceDocumentSchema.parse(value);
+}
 
 // ===========================================================================
 // Contract G — RP attestation (`agent-rp-attestation+jwt`)

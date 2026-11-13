@@ -16,11 +16,12 @@
  *   1  document retrieved and parsed, but failed conformance
  *   2  could not fetch a usable document (network/HTTP/redirect/size/parse)
  *
- * Safety (spec §3.6 / §8.1): only the top-level URL provided by the user (and
- * explicitly requested probe targets) is ever fetched. URLs found inside the
- * document body are never followed by default; `terms.text` is never executed
- * or interpreted. Every fetch applies a timeout, a bounded read, and a
- * same-origin redirect limit.
+ * Safety (spec §3.6 / §8.1): only the top-level URL provided by the user and
+ * explicitly requested targets (`--probe-*`, and the `attestation.uri` source
+ * under `--verify-attestation`) are ever fetched. A source URI is fetched only
+ * after the conformance host binding passes. `terms.text` is never executed or
+ * interpreted. Every fetch applies a timeout, a bounded read, and a same-origin
+ * redirect limit.
  */
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
@@ -34,19 +35,22 @@ import {
   isAbsoluteOrigin,
   isAbsoluteProtocolUrl,
   isCanonicalOrigin,
+  isDevelopmentOrigin,
   isRecord,
   normalizeOrigin,
   parseAbsoluteHttpUrl,
 } from "./http";
 import { loadRootSchema, validateJsonSchema, type SchemaError } from "./json-schema";
-import { AgentSignupDiscoverySchema } from "./schema";
 import {
-  ATTESTATION_FIELD_MAX_LENGTH,
-  COMPACT_JWS_PATTERN,
-} from "./constants";
+  AgentSignupDiscoverySchema,
+  AttestationSourceSchema,
+  type AttestationMode,
+} from "./schema";
 import {
   parseClockValue,
   verifyRpAttestation,
+  verifyRpAttestationSource,
+  type AttestationVerificationOptions,
   type AttestationVerificationResult,
 } from "./validate-attestation";
 import { VALIDATOR_ID, VALIDATOR_VERSION } from "./version";
@@ -76,6 +80,8 @@ interface Check {
   title: string;
   status: CheckStatus;
   message: string;
+  /** Stable machine-readable reason code for a failure (or an unchecked rule). */
+  reason?: string;
   expected?: string;
   actual?: string;
   path?: string;
@@ -135,6 +141,16 @@ interface ParsedOptions {
   trustedBrokers: string[];
   jwks: string | null;
   at: number | null;
+  /** Fixture-only: a local source response used instead of a network fetch. */
+  sourceResponse: InjectedAttestationSourceResponse | null;
+  /** Fixture-only: path to a JSON file holding that response. */
+  sourceResponsePath: string | null;
+}
+
+/** A stand-in for the `attestation.uri` HTTP response (fixture runs, no network). */
+export interface InjectedAttestationSourceResponse {
+  status: number;
+  body: unknown;
 }
 
 /** Env fallback for the trusted RP-broker list (spec §5.14). */
@@ -170,6 +186,8 @@ function parseArgs(argv: string[]): ParsedOptions {
     trustedBrokers: [],
     jwks: null,
     at: null,
+    sourceResponse: null,
+    sourceResponsePath: null,
   };
 
   let brokerFlagSeen = false;
@@ -210,6 +228,15 @@ function parseArgs(argv: string[]): ParsedOptions {
       options.jwks = value;
     } else if (arg.startsWith("--jwks=")) {
       options.jwks = arg.slice("--jwks=".length);
+    } else if (arg === "--source-response") {
+      const value = argv[i + 1];
+      i += 1;
+      if (value === undefined || value.startsWith("-")) {
+        throw new UsageError("--source-response expects a path");
+      }
+      options.sourceResponsePath = value;
+    } else if (arg.startsWith("--source-response=")) {
+      options.sourceResponsePath = arg.slice("--source-response=".length);
     } else if (arg === "--at") {
       const value = argv[i + 1];
       i += 1;
@@ -289,8 +316,9 @@ function printHelp(): void {
     "  --probe-endpoints   opt-in: non-destructively HEAD/OPTIONS the advertised",
     "                      agent_signup endpoint (never POST / never signup)",
     "  --verify-attestation",
-    "                      parse and verify rp_attestation if present (opt-in; may",
-    "                      fetch the issuer JWKS). Absent field = unverified.",
+    "                      fetch and verify the source named by `attestation.uri`",
+    "                      (opt-in). Absent `attestation` = unverified. Typed",
+    "                      broker failures are verification results.",
     "  --require-attestation",
     "                      implies --verify-attestation; a non-verified result fails",
     "  --trusted-rp-broker <issuer>",
@@ -299,6 +327,10 @@ function printHelp(): void {
     "  --jwks <path-or-url>",
     "                      pin exactly one issuer's JWKS for offline runs (never",
     "                      bypasses signature checks, never merges issuers)",
+    "  --source-response <path>",
+    "                      fixture-only: read the attestation source response from",
+    "                      a local JSON file `{ status, body }` instead of fetching",
+    "                      (offline runs; the body is never echoed)",
     "  --at <rfc3339|epoch>",
     "                      freeze the clock for deterministic runs (fixtures only)",
     "  --timeout <ms>      per-fetch timeout (default " + DEFAULT_TIMEOUT_MS + ")",
@@ -437,7 +469,7 @@ const ALLOWED_TOP_LEVEL_FIELDS = new Set([
   "terms",
   "endpoints",
   "extensions",
-  "rp_attestation",
+  "attestation",
 ]);
 
 /** Reverse-DNS namespace: at least two dot-separated labels (for example `dev.vaporcloud`). */
@@ -460,8 +492,8 @@ function warnCheck(id: string, title: string, message: string): Check {
   return { id, title, status: "warn", message };
 }
 
-function skip(id: string, title: string, message: string): Check {
-  return { id, title, status: "skip", message };
+function skip(id: string, title: string, message: string, extra?: Partial<Check>): Check {
+  return { id, title, status: "skip", message, ...extra };
 }
 
 function formatZodIssue(issue: { path: (string | number)[]; message: string }): string {
@@ -712,47 +744,578 @@ function checkOptionalFields(document: Record<string, unknown>): Check {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Attestation publication checks (v1.3.0; spec §5.4 and §14).
+// ---------------------------------------------------------------------------
+
 /**
- * Field-level conformance check for `rp_attestation` (spec §5.3). A malformed
- * field is a **conformance** error regardless of verification flags; an absent
- * field is conformant and skip-level here.
+ * Frozen v1.3.0 `--json` reason codes. I02/I06 consume these names; do not
+ * rename one without a contract decision.
+ *
+ * Conformance checks (`Check.reason`):
+ *   - `attestation_mode_invalid`, `attestation_uri_invalid`
+ *   - `attestation_uri_host_untrusted`, `attestation_uri_host_unbound`
+ *   - `attestation_binding_unchecked`, `rp_attestation_removed`
+ *
+ * Verification (`attestation.reason`), in addition to the unchanged JWT reasons
+ * (`jws_parse`, `wrong_typ`, `wrong_alg`, `missing_kid`, `claims_invalid`,
+ * `unknown_kid`, `duplicate_jwk_kid`, `bad_signature`, `not_yet_valid`,
+ * `wrong_origin`, `wrong_audience`, `audience_unverifiable`,
+ * `rp_broker_untrusted`, `rp_broker_unavailable`):
+ *   - `absent`, `not_checked`, `field_malformed`, `binding_failed`
+ *   - `attestation_expired`, `origin_unverifiable`
+ *   - `provider_suspended` (403), `attestation_not_found` (404),
+ *     `attestation_revoked` (410), `invalid_request` (400), `rate_limited` (429),
+ *     `broker_unavailable` (5xx)
+ *   - `source_unavailable`, `source_document_invalid`,
+ *     `source_response_unreadable`, `attestation_issuer_mismatch`
  */
-function checkRpAttestationField(document: Record<string, unknown>): Check {
-  if (!("rp_attestation" in document)) {
+
+/** Mirrors the frozen mode enum (`AttestationModeSchema`). */
+const ATTESTATION_MODES: ReadonlySet<string> = new Set(["broker", "provider"]);
+
+/**
+ * Mirrors `isAttestationSourceUri` in ./schema.ts: absolute HTTPS (localhost
+ * development exception), no userinfo, no fragment, no whitespace.
+ */
+function attestationUriProblem(value: unknown): string | null {
+  if (typeof value !== "string" || value.length === 0) {
+    return "attestation.uri must be a non-empty string";
+  }
+  if (/\s/.test(value)) {
+    return "attestation.uri must not contain whitespace";
+  }
+  const url = parseAbsoluteHttpUrl(value);
+  if (url === null) {
+    return "attestation.uri must be an absolute https URL (a relative or non-URL value is rejected)";
+  }
+  if (url.protocol !== "https:" && !isDevelopmentOrigin(url)) {
+    return "attestation.uri must be HTTPS (http://localhost / http://127.0.0.1 is the development exception)";
+  }
+  if (url.username !== "" || url.password !== "") {
+    return "attestation.uri must not carry userinfo";
+  }
+  if (url.hash !== "") {
+    return "attestation.uri must not carry a fragment";
+  }
+  return null;
+}
+
+function checkAttestationMode(raw: unknown): Check {
+  const id = "field.attestation.mode";
+  const title = "attestation.mode";
+  if (raw === undefined) {
+    return skip(id, title, "no attestation object (OPTIONAL; absence is conformant and unverified)");
+  }
+  if (!isRecord(raw)) {
+    return fail(id, title, "attestation must be an object with `mode` and `uri`", {
+      reason: "attestation_mode_invalid",
+      actual: JSON.stringify(raw ?? null),
+    });
+  }
+  const mode = raw.mode;
+  if (typeof mode !== "string" || !ATTESTATION_MODES.has(mode)) {
+    return fail(id, title, "attestation.mode must be exactly `broker` or `provider`", {
+      reason: "attestation_mode_invalid",
+      expected: "broker | provider",
+      actual: JSON.stringify(mode ?? null),
+    });
+  }
+  return ok(id, title, `attestation.mode is \`${mode}\``);
+}
+
+function checkAttestationUri(raw: unknown): Check {
+  const id = "field.attestation.uri";
+  const title = "attestation.uri";
+  if (raw === undefined) {
+    return skip(id, title, "no attestation object (OPTIONAL; absence is conformant and unverified)");
+  }
+  if (!isRecord(raw)) {
+    return fail(id, title, "attestation.uri is unreachable: attestation must be an object", {
+      reason: "attestation_uri_invalid",
+    });
+  }
+  const problem = attestationUriProblem(raw.uri);
+  if (problem !== null) {
+    return fail(id, title, problem, {
+      reason: "attestation_uri_invalid",
+      actual: JSON.stringify(raw.uri ?? null),
+    });
+  }
+  return ok(id, title, `attestation.uri is a stable absolute source URL (${String(raw.uri)})`);
+}
+
+/** True when `uri` has the same scheme/port and the same host or a subdomain of it. */
+function isSameOrSubdomainOrigin(uri: URL, documentOrigin: string): boolean {
+  let origin: URL;
+  try {
+    origin = new URL(documentOrigin);
+  } catch {
+    return false;
+  }
+  if (uri.protocol !== origin.protocol || uri.port !== origin.port) {
+    return false;
+  }
+  const host = uri.hostname.toLowerCase();
+  const base = origin.hostname.toLowerCase();
+  return host === base || host.endsWith(`.${base}`);
+}
+
+/**
+ * Host binding for the source URI (spec §5.4; ledger §3.1):
+ *
+ * - `broker`: the URI origin MUST be a member of the discovery `issuer_allowlist`
+ *   and, when a trusted broker list was supplied, a trusted broker origin.
+ * - `provider`: the URI origin MUST equal the discovery origin or be a subdomain
+ *   of it. In file mode there is no fetch origin, so the binding is unchecked
+ *   (`__fixture_origin` restores it) and never a pass.
+ */
+function checkAttestationBinding(
+  document: Record<string, unknown>,
+  raw: unknown,
+  options: ParsedOptions,
+  documentOrigin: string | null,
+): Check {
+  const id = "field.attestation.binding";
+  const title = "attestation host binding";
+  if (raw === undefined) {
+    return skip(id, title, "no attestation object (OPTIONAL; absence is conformant and unverified)");
+  }
+  if (!isRecord(raw) || typeof raw.mode !== "string" || !ATTESTATION_MODES.has(raw.mode)) {
+    return skip(id, title, "binding not checked: attestation.mode is invalid");
+  }
+  const url = parseAbsoluteHttpUrl(raw.uri);
+  if (url === null || attestationUriProblem(raw.uri) !== null) {
+    return skip(id, title, "binding not checked: attestation.uri is not a valid source URL");
+  }
+  const uriOrigin = normalizeOrigin(url.origin);
+
+  if (raw.mode === "broker") {
+    const allowlist = Array.isArray(document.issuer_allowlist)
+      ? document.issuer_allowlist.filter((entry): entry is string => typeof entry === "string")
+      : [];
+    const inAllowlist = allowlist.some((entry) => normalizeOrigin(entry) === uriOrigin);
+    if (!inAllowlist) {
+      return fail(
+        id,
+        title,
+        `attestation.uri origin ${uriOrigin} is not a member of issuer_allowlist (${allowlist.join(", ") || "(none)"})`,
+        { reason: "attestation_uri_host_untrusted", actual: uriOrigin },
+      );
+    }
+    if (
+      options.trustedBrokers.length > 0 &&
+      !options.trustedBrokers.some((entry) => normalizeOrigin(entry) === uriOrigin)
+    ) {
+      return fail(
+        id,
+        title,
+        `attestation.uri origin ${uriOrigin} is not a trusted broker origin (--trusted-rp-broker)`,
+        { reason: "attestation_uri_host_untrusted", actual: uriOrigin },
+      );
+    }
+    const trustNote =
+      options.trustedBrokers.length > 0
+        ? "a trusted broker origin"
+        : "in issuer_allowlist (no trusted broker list configured, so broker trust was not cross-checked)";
+    return ok(id, title, `attestation.uri origin ${uriOrigin} is ${trustNote}`);
+  }
+
+  if (documentOrigin === null) {
     return skip(
-      "field.rp_attestation",
-      "rp_attestation",
-      "no rp_attestation field (OPTIONAL in v1.2; document is conformant and unverified)",
+      id,
+      title,
+      "binding unchecked: file mode has no fetch origin (declare `__fixture_origin` or validate the URL)",
+      { reason: "attestation_binding_unchecked" },
     );
   }
-  const value = document.rp_attestation;
-  if (typeof value !== "string") {
+  if (!isSameOrSubdomainOrigin(url, documentOrigin)) {
     return fail(
-      "field.rp_attestation",
-      "rp_attestation",
-      "rp_attestation must be a compact JWS string",
-      { actual: JSON.stringify(value ?? null) },
-    );
-  }
-  if (value.length > ATTESTATION_FIELD_MAX_LENGTH) {
-    return fail(
-      "field.rp_attestation",
-      "rp_attestation",
-      `rp_attestation exceeds the ${ATTESTATION_FIELD_MAX_LENGTH}-character cap (${value.length})`,
-    );
-  }
-  if (!COMPACT_JWS_PATTERN.test(value)) {
-    return fail(
-      "field.rp_attestation",
-      "rp_attestation",
-      "rp_attestation must be three unpadded base64url segments separated by `.`",
+      id,
+      title,
+      `attestation.uri origin ${uriOrigin} is neither the discovery origin ${documentOrigin} nor a subdomain of it`,
+      { reason: "attestation_uri_host_unbound", expected: documentOrigin, actual: uriOrigin },
     );
   }
   return ok(
-    "field.rp_attestation",
-    "rp_attestation",
-    "rp_attestation is a compact JWS within the size bound",
+    id,
+    title,
+    `attestation.uri origin ${uriOrigin} is the discovery origin ${documentOrigin} or a subdomain of it`,
   );
+}
+
+/**
+ * `rp_attestation` was removed in v1.3.0. A document that still carries it is
+ * non-conformant: there is no compatibility field, embedded fallback, or dual
+ * publication. Contract F receipt/abuse bodies keep the historical field name.
+ */
+function checkRpAttestationRemoved(document: Record<string, unknown>): Check {
+  if (!("rp_attestation" in document)) {
+    return skip(
+      "field.rp_attestation",
+      "rp_attestation (removed in v1.3.0)",
+      "no rp_attestation field (removed in v1.3.0; absence is conformant)",
+    );
+  }
+  return fail(
+    "field.rp_attestation",
+    "rp_attestation (removed in v1.3.0)",
+    "rp_attestation was removed in v1.3.0: discovery MUST publish `attestation: { mode, uri }` instead. Contract F receipt and abuse bodies keep `rp_attestation`.",
+    { reason: "rp_attestation_removed" },
+  );
+}
+
+function verificationOptions(options: ParsedOptions): AttestationVerificationOptions {
+  return {
+    trustedBrokers: options.trustedBrokers,
+    jwks: options.jwks,
+    at: options.at,
+    timeoutMs: options.timeoutMs,
+    maxBytes: options.maxBytes,
+    required: options.requireAttestation,
+    check: options.verifyAttestation || options.requireAttestation,
+  };
+}
+
+/** A present source with a known non-verified outcome (no JWT fields to report). */
+function sourceStatusResult(
+  options: ParsedOptions,
+  status: AttestationVerificationResult["status"],
+  reason: string,
+  message: string | null,
+  mode: AttestationMode | null,
+  sourceUri: string | null,
+): AttestationVerificationResult {
+  const result = emptyAttestation(options, reason);
+  result.present = true;
+  result.checked = true;
+  result.status = status;
+  result.mode = mode;
+  result.source_uri = sourceUri;
+  if (message !== null) {
+    result.errors.push(`${reason}: ${message}`);
+  }
+  return result;
+}
+
+/** Broker-managed statuses this validator maps to typed verification results. */
+function isBrokerSourceStatus(status: number): boolean {
+  return (
+    status === 200 ||
+    status === 400 ||
+    status === 403 ||
+    status === 404 ||
+    status === 410 ||
+    status === 429 ||
+    (status >= 500 && status < 600)
+  );
+}
+
+type SourceResolution =
+  | { ok: true; document: unknown }
+  | {
+      ok: false;
+      status: AttestationVerificationResult["status"];
+      reason: string;
+      message: string;
+    };
+
+/** Extracts only a well-shaped broker error code; never echoes the body. */
+function brokerErrorCode(text: string): string | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed)) {
+    return null;
+  }
+  const candidate =
+    typeof parsed.code === "string"
+      ? parsed.code
+      : typeof parsed.error === "string"
+        ? parsed.error
+        : null;
+  return candidate !== null && /^[a-z][a-z0-9_]{0,63}$/.test(candidate) ? candidate : null;
+}
+
+/** Maps a typed broker HTTP answer to a verification result (never a conformance error). */
+function typedBrokerFailure(status: number, text: string): SourceResolution {
+  const table: Record<string, { status: AttestationVerificationResult["status"]; reason: string }> = {
+    "400": { status: "invalid", reason: "invalid_request" },
+    "403": { status: "suspended", reason: "provider_suspended" },
+    "404": { status: "unverified", reason: "attestation_not_found" },
+    "410": { status: "invalid", reason: "attestation_revoked" },
+    "429": { status: "unavailable", reason: "rate_limited" },
+  };
+  const mapped =
+    status >= 500 && status < 600
+      ? { status: "unavailable" as const, reason: "broker_unavailable" }
+      : table[String(status)] ?? { status: "unavailable" as const, reason: "broker_unavailable" };
+  const code = brokerErrorCode(text);
+  return {
+    ok: false,
+    status: mapped.status,
+    reason: mapped.reason,
+    message: `the broker source returned HTTP ${status}${code !== null ? ` (${code})` : ""}`,
+  };
+}
+
+/** Reads an injected fixture response (programmatic object or a JSON file). */
+async function injectedSourceResponse(
+  options: ParsedOptions,
+): Promise<{ response: InjectedAttestationSourceResponse | null; error: string | null }> {
+  if (options.sourceResponse !== null) {
+    return { response: options.sourceResponse, error: null };
+  }
+  const path = options.sourceResponsePath;
+  if (path === null) {
+    return { response: null, error: null };
+  }
+  let raw: string;
+  try {
+    raw = await readFile(path, "utf8");
+  } catch (error) {
+    return {
+      response: null,
+      error: `could not read --source-response file: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  if (Buffer.byteLength(raw, "utf8") > options.maxBytes) {
+    return { response: null, error: `--source-response file exceeds the ${options.maxBytes}-byte cap` };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { response: null, error: "--source-response file is not valid JSON" };
+  }
+  if (!isRecord(parsed) || typeof parsed.status !== "number" || !("body" in parsed)) {
+    return {
+      response: null,
+      error: '--source-response file must be `{ "status": <number>, "body": <json> }`',
+    };
+  }
+  return { response: { status: parsed.status, body: parsed.body }, error: null };
+}
+
+/**
+ * Obtains the source document for `attestation.uri`:
+ *
+ * - an injected fixture response, otherwise
+ * - a bounded fetch (timeout, size cap, same-origin redirects only).
+ *
+ * Broker-managed typed answers are verification results; provider outages are
+ * `unavailable`; a malformed source body is `invalid`. The source body is never
+ * echoed into an error.
+ */
+async function resolveAttestationSource(
+  source: { mode: AttestationMode; uri: string },
+  options: ParsedOptions,
+): Promise<SourceResolution> {
+  const injected = await injectedSourceResponse(options);
+  if (injected.error !== null) {
+    return {
+      ok: false,
+      status: "unavailable",
+      reason: "source_response_unreadable",
+      message: injected.error,
+    };
+  }
+
+  let status: number;
+  let text: string | null = null;
+  let body: unknown = null;
+  let contentType: string | null = null;
+
+  if (injected.response !== null) {
+    status = injected.response.status;
+    body = injected.response.body;
+  } else {
+    const outcome = await fetchResource(source.uri, {
+      timeoutMs: options.timeoutMs,
+      maxBytes: options.maxBytes,
+      requireJson: false,
+      acceptStatus: source.mode === "broker" ? isBrokerSourceStatus : (value) => value === 200,
+    });
+    if (!outcome.ok) {
+      const detail = outcome.message;
+      return source.mode === "broker"
+        ? {
+            ok: false,
+            status: "unavailable",
+            reason: "broker_unavailable",
+            message: `could not fetch the broker source: ${detail}`,
+          }
+        : {
+            ok: false,
+            status: "unavailable",
+            reason: "source_unavailable",
+            message: `could not fetch the provider source: ${detail}`,
+          };
+    }
+    status = outcome.status;
+    text = outcome.text;
+    contentType = outcome.headers.get("content-type");
+  }
+
+  if (status === 200) {
+    if (text !== null) {
+      const mime = (contentType ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+      if (mime !== "application/json") {
+        return {
+          ok: false,
+          status: "invalid",
+          reason: "source_document_invalid",
+          message: `the source document must be served as application/json (received ${mime || "(none)"})`,
+        };
+      }
+      try {
+        body = JSON.parse(text);
+      } catch {
+        return {
+          ok: false,
+          status: "invalid",
+          reason: "source_document_invalid",
+          message: "the source document is not valid JSON",
+        };
+      }
+    }
+    return { ok: true, document: body };
+  }
+
+  if (source.mode === "broker") {
+    return typedBrokerFailure(status, text ?? "");
+  }
+  return {
+    ok: false,
+    status: "unavailable",
+    reason: "source_unavailable",
+    message: `the provider source returned HTTP ${status}`,
+  };
+}
+
+/**
+ * Evaluates the optional `attestation` object end to end: field checks and host
+ * binding (conformance), then the opt-in source fetch and JWT verification
+ * (never a conformance error).
+ */
+async function evaluateAttestation(
+  document: Record<string, unknown>,
+  options: ParsedOptions,
+  documentOrigin: string | null,
+  inputOrigin: URL | null,
+): Promise<{ checks: Check[]; result: AttestationVerificationResult }> {
+  const raw = document.attestation;
+  const modeCheck = checkAttestationMode(raw);
+  const uriCheck = checkAttestationUri(raw);
+  const bindingCheck = checkAttestationBinding(document, raw, options, documentOrigin);
+  const checks = [modeCheck, uriCheck, bindingCheck];
+  const context = {
+    documentOrigin,
+    documentAudience: typeof document.audience === "string" ? document.audience : null,
+  };
+
+  if (raw === undefined) {
+    return {
+      checks,
+      result: await verifyRpAttestation(undefined, context, verificationOptions(options)),
+    };
+  }
+
+  const parsed = AttestationSourceSchema.safeParse(raw);
+  if (!parsed.success) {
+    // A malformed object is a conformance error and never a fetch attempt: there
+    // is nothing to select. Report `not_checked` rather than mislabelling a
+    // non-source as `invalid` verification evidence.
+    const result = sourceStatusResult(
+      options,
+      "not_checked",
+      "field_malformed",
+      null,
+      null,
+      null,
+    );
+    result.checked = false;
+    result.checks.push({
+      id: "attestation.field.present",
+      status: "fail",
+      message: "attestation must be an object `{ mode, uri }`",
+    });
+    return { checks, result };
+  }
+
+  const source = parsed.data;
+  if (!options.verifyAttestation && !options.requireAttestation) {
+    const result = sourceStatusResult(options, "not_checked", "not_checked", null, source.mode, source.uri);
+    result.checked = false;
+    result.checks.push({
+      id: "attestation.source",
+      status: "skip",
+      message: "source verification not requested (pass --verify-attestation)",
+    });
+    return { checks, result };
+  }
+
+  const binding = bindingCheck;
+  if (binding.status === "fail") {
+    // Never fetch an untrusted or unbound URI. The conformance check is the
+    // authoritative failure; the attestation result records why no token exists.
+    return {
+      checks,
+      result: sourceStatusResult(
+        options,
+        "not_checked",
+        "binding_failed",
+        binding.message,
+        source.mode,
+        source.uri,
+      ),
+    };
+  }
+
+  // Reuse the document-derived probe guard: a public document cannot steer this
+  // opt-in fetch at a loopback/link-local/private target, and a plain http
+  // target is refused unless the input origin is localhost/127.0.0.1.
+  const refusal = probeTargetRefusal(source.uri, inputOrigin);
+  if (refusal !== null) {
+    return {
+      checks,
+      result: sourceStatusResult(
+        options,
+        "unavailable",
+        source.mode === "broker" ? "broker_unavailable" : "source_unavailable",
+        `the attestation source was not fetched: ${refusal}`,
+        source.mode,
+        source.uri,
+      ),
+    };
+  }
+
+  const resolved = await resolveAttestationSource(source, options);
+  if (!resolved.ok) {
+    return {
+      checks,
+      result: sourceStatusResult(
+        options,
+        resolved.status,
+        resolved.reason,
+        resolved.message,
+        source.mode,
+        source.uri,
+      ),
+    };
+  }
+
+  return {
+    checks,
+    result: await verifyRpAttestationSource(
+      resolved.document,
+      { ...context, mode: source.mode, sourceUri: source.uri },
+      verificationOptions(options),
+    ),
+  };
 }
 
 /** A synthetic attestation result for runs where the document never arrived. */
@@ -768,11 +1331,14 @@ function emptyAttestation(
     verified: false,
     status: "unverified",
     reason,
+    mode: null,
+    source_uri: null,
     iss: null,
     jti: null,
     origin: null,
     audience: null,
     level: null,
+    expires_at: null,
     checked_at: new Date(now * 1000).toISOString(),
     jwks_source: null,
     checks: [],
@@ -1020,7 +1586,7 @@ async function checkDocument(
   );
 
   addCheck(checks, checkOptionalFields(document));
-  addCheck(checks, checkRpAttestationField(document));
+  addCheck(checks, checkRpAttestationRemoved(document));
   addCheck(checks, checkScopeBoundary(findings));
   addCheck(checks, checkUnknownTopLevel(document, forbiddenTopLevel));
   addCheck(checks, checkExtensionsNamespace(document));
@@ -1052,27 +1618,21 @@ async function checkDocument(
     }
   }
 
+  const attestationEvaluation = await evaluateAttestation(
+    document,
+    options,
+    documentOrigin,
+    inputOrigin,
+  );
+  for (const check of attestationEvaluation.checks) {
+    addCheck(checks, check);
+  }
+
   return {
     checks,
     probes,
     metadata: buildMetadata(document),
-    attestation: await verifyRpAttestation(
-      document.rp_attestation,
-      {
-        documentOrigin,
-        documentAudience:
-          typeof document.audience === "string" ? document.audience : null,
-      },
-      {
-        trustedBrokers: options.trustedBrokers,
-        jwks: options.jwks,
-        at: options.at,
-        timeoutMs: options.timeoutMs,
-        maxBytes: options.maxBytes,
-        required: options.requireAttestation,
-        check: options.verifyAttestation,
-      },
-    ),
+    attestation: attestationEvaluation.result,
   };
 }
 
@@ -1675,11 +2235,14 @@ function toJson(result: RunResult): Record<string, unknown> {
       verified: result.attestation.verified,
       status: result.attestation.status,
       reason: result.attestation.reason,
+      mode: result.attestation.mode,
+      source_uri: result.attestation.source_uri,
       iss: result.attestation.iss,
       jti: result.attestation.jti,
       origin: result.attestation.origin,
       audience: result.attestation.audience,
       level: result.attestation.level,
+      expires_at: result.attestation.expires_at,
       checked_at: result.attestation.checked_at,
       jwks_source: result.attestation.jwks_source,
       checks: result.attestation.checks,
@@ -1703,6 +2266,7 @@ function toJson(result: RunResult): Record<string, unknown> {
       title: check.title,
       status: check.status,
       message: check.message,
+      ...(check.reason !== undefined ? { reason: check.reason } : {}),
       ...(check.expected !== undefined ? { expected: check.expected } : {}),
       ...(check.actual !== undefined ? { actual: check.actual } : {}),
       ...(check.path !== undefined ? { path: check.path } : {}),
@@ -1772,6 +2336,12 @@ function printHuman(result: RunResult): void {
   lines.push(
     `ATTESTATION: ${result.attestation.status}${result.attestation.reason ? ` (${result.attestation.reason})` : ""}`,
   );
+  if (result.attestation.mode !== null) {
+    lines.push(`  mode: ${result.attestation.mode}`);
+  }
+  if (result.attestation.source_uri !== null) {
+    lines.push(`  source: ${result.attestation.source_uri}`);
+  }
   if (result.attestation.checks.length > 0) {
     for (const check of result.attestation.checks) {
       lines.push(`  [${statusLabel(check.status)}] ${check.id}  ${check.message}`);
@@ -1849,6 +2419,8 @@ export interface DiscoveryValidationOptions {
   maxBytes?: number;
   probeJwks?: boolean;
   probeEndpoints?: boolean;
+  /** Fixture-only: a local source response used instead of a network fetch. */
+  sourceResponse?: InjectedAttestationSourceResponse | null;
 }
 
 export type DiscoveryRunResult = RunResult;
@@ -1870,6 +2442,8 @@ export async function validateDiscoveryInput(
     trustedBrokers: overrides.trustedBrokers ?? [],
     jwks: overrides.jwks ?? null,
     at: overrides.at ?? null,
+    sourceResponse: overrides.sourceResponse ?? null,
+    sourceResponsePath: null,
   };
   const isUrl = /^https?:\/\//i.test(input);
   return isUrl ? runUrlMode(options, input) : runFileMode(options, input);

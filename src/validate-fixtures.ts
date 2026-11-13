@@ -32,6 +32,7 @@ import {
 import {
   BrokerMetadataSchema,
   AttestationStatusClaimsVerifierSchema,
+  AttestationSourceDocumentSchema,
   RpAttestationClaimsSchema,
   RpAttestationClaimsVerifierSchema,
 } from "./schema";
@@ -41,7 +42,11 @@ import {
   verifyRpAttestation,
   type AttestationVerificationOptions,
 } from "./validate-attestation";
-import { validateDiscoveryInput } from "./validate-discovery";
+import {
+  validateDiscoveryInput,
+  type DiscoveryRunResult,
+  type InjectedAttestationSourceResponse,
+} from "./validate-discovery";
 import { verifyAbuseFixture, verifyReceiptFixture, verifyStatusFixture } from "./verify-artifacts";
 
 const ROOT = process.cwd();
@@ -56,11 +61,21 @@ interface CaseOptions {
   trustedBrokers?: string[];
   jwks?: string | null;
   at?: string;
+  /** Path to a `{ status, body }` fixture response used instead of a fetch. */
+  sourceResponse?: string;
 }
 
 interface FixtureCase {
   id: string;
-  kind: "discovery" | "attestation" | "receipt" | "abuse" | "status" | "metadata" | "provider";
+  kind:
+    | "discovery"
+    | "attestation"
+    | "receipt"
+    | "abuse"
+    | "status"
+    | "metadata"
+    | "provider"
+    | "source";
   path?: string;
   jwt?: string;
   attestation?: string;
@@ -179,19 +194,43 @@ async function runDiscoveryCase(
   if (path === undefined) {
     return { id: fixture.id, passed: false, detail: "discovery case has no path" };
   }
+  let sourceResponse: InjectedAttestationSourceResponse | null = null;
+  if (options.sourceResponse !== undefined) {
+    const raw = readRecord(await readJson(options.sourceResponse));
+    if (raw === null || typeof raw.status !== "number" || !("body" in raw)) {
+      return {
+        id: fixture.id,
+        passed: false,
+        detail: `source response ${options.sourceResponse} must be { status, body }`,
+      };
+    }
+    sourceResponse = { status: raw.status, body: raw.body };
+  }
   const result = await validateDiscoveryInput(path, {
     verifyAttestation: options.verifyAttestation ?? false,
     requireAttestation: options.requireAttestation ?? false,
     trustedBrokers: options.trustedBrokers ?? [],
     jwks: options.jwks ?? null,
     at: optionClock(options),
+    sourceResponse,
   });
   compare(fixture.expect.exitCode, result.exitCode, "exitCode", problems);
   compare(fixture.expect.status, result.attestation.status, "attestation.status", problems);
+  compare(fixture.expect.reason, result.attestation.reason, "attestation.reason", problems);
+  compare(fixture.expect.mode, result.attestation.mode, "attestation.mode", problems);
+  compare(fixture.expect.sourceUri, result.attestation.source_uri, "attestation.source_uri", problems);
   compare(fixture.expect.level, result.attestation.level, "attestation.level", problems);
   compare(fixture.expect.conformance, result.conformance.valid, "conformance.valid", problems);
   compare(fixture.expect.evaluated, result.conformance.evaluated, "conformance.evaluated", problems);
   compare(fixture.expect.verified, result.attestation.verified, "attestation.verified", problems);
+  compareChecks(fixture.expect.checks, result, problems);
+  const failCheck = fixture.expect.failCheck;
+  if (typeof failCheck === "string") {
+    const failing = result.checks.filter((check) => check.status === "fail").map((check) => check.id);
+    if (!failing.includes(failCheck)) {
+      problems.push(`expected a failing check ${failCheck}, got ${JSON.stringify(failing)}`);
+    }
+  }
   const warningNeedle = fixture.expect.warningsInclude;
   if (typeof warningNeedle === "string") {
     const found = result.attestation.warnings.some((warning) => warning.includes(warningNeedle));
@@ -206,6 +245,48 @@ async function runDiscoveryCase(
     passed: problems.length === 0,
     detail: problems.length === 0 ? `exit ${result.exitCode}, ${result.attestation.status}` : problems.join("; "),
   };
+}
+
+/**
+ * Asserts a map of `check id -> "status"` or
+ * `{ status?: string; reason?: string }` against the discovery result.
+ */
+function compareChecks(
+  expected: unknown,
+  result: DiscoveryRunResult,
+  problems: string[],
+): void {
+  if (expected === undefined) {
+    return;
+  }
+  if (readRecord(expected) === null) {
+    problems.push("expect.checks must be an object");
+    return;
+  }
+  for (const [id, expectation] of Object.entries(expected as Record<string, unknown>)) {
+    const check = result.checks.find((candidate) => candidate.id === id);
+    if (check === undefined) {
+      problems.push(`expected a check ${id}, but the run has none`);
+      continue;
+    }
+    if (typeof expectation === "string") {
+      if (check.status !== expectation) {
+        problems.push(`check ${id}: expected status ${expectation}, got ${check.status}`);
+      }
+      continue;
+    }
+    const record = readRecord(expectation);
+    if (record === null) {
+      problems.push(`check ${id}: expectation must be a status string or an object`);
+      continue;
+    }
+    if (typeof record.status === "string" && check.status !== record.status) {
+      problems.push(`check ${id}: expected status ${record.status}, got ${check.status}`);
+    }
+    if (typeof record.reason === "string" && check.reason !== record.reason) {
+      problems.push(`check ${id}: expected reason ${record.reason}, got ${String(check.reason)}`);
+    }
+  }
 }
 
 async function runAttestationCase(
@@ -503,6 +584,48 @@ async function runProviderCase(
   };
 }
 
+/**
+ * Validates an attestation-source response fixture (v1.3.0, F1). The file is
+ * `{ status, body }`; only a `200` body must conform to the source document
+ * schema. The checked-in JSON Schema and Zod must agree.
+ */
+async function runSourceCase(
+  fixture: FixtureCase,
+  _defaults: CaseOptions,
+): Promise<CaseOutcome> {
+  const problems: string[] = [];
+  if (fixture.path === undefined) {
+    return { id: fixture.id, passed: false, detail: "source case has no path" };
+  }
+  const envelope = readRecord(await readJson(fixture.path));
+  if (envelope === null || !("body" in envelope)) {
+    return { id: fixture.id, passed: false, detail: `${fixture.path} must be { status, body }` };
+  }
+  const body = envelope.body;
+  const schema = checkAgainstRootSchema(body, "attestation-source.schema.json");
+  const zod = AttestationSourceDocumentSchema.safeParse(body).success;
+  compare(fixture.expect.schema, schema.ok, "schema.valid", problems);
+  compare(fixture.expect.zod, zod, "zod.valid", problems);
+  compare(fixture.expect.valid, schema.ok && zod, "document.valid", problems);
+  if (schema.ok && zod) {
+    const attestation = readRecord(body)?.attestation;
+    const parsed = typeof attestation === "string" ? parseCompactJws(attestation) : { ok: false as const };
+    if (!parsed.ok) {
+      problems.push("a valid source document must carry a parseable compact JWS");
+    } else if (
+      parsed.jws.header.typ !== "agent-rp-attestation+jwt" ||
+      parsed.jws.header.alg !== "EdDSA"
+    ) {
+      problems.push("the source JWS header must be EdDSA + agent-rp-attestation+jwt");
+    }
+  }
+  return {
+    id: fixture.id,
+    passed: problems.length === 0,
+    detail: problems.length === 0 ? (schema.ok && zod ? "valid source document" : "invalid as expected") : problems.join("; "),
+  };
+}
+
 async function runMetadataCase(
   fixture: FixtureCase,
   _defaults: CaseOptions,
@@ -564,6 +687,8 @@ async function runCase(fixture: FixtureCase, defaults: CaseOptions): Promise<Cas
       return runMetadataCase(fixture, defaults);
     case "provider":
       return runProviderCase(fixture, defaults);
+    case "source":
+      return runSourceCase(fixture, defaults);
     default:
       return { id: fixture.id, passed: false, detail: `unknown fixture kind: ${String((fixture as { kind: unknown }).kind)}` };
   }

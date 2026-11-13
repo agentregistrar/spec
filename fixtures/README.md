@@ -1,4 +1,4 @@
-# Fixtures — `agent-identity-v1` `v1.2.0`
+# Fixtures — `agent-identity-v1` `v1.3.0`
 
 This directory holds every checked-in fixture for the discovery, attestation, receipt, abuse, status,
 and provider-request surfaces, plus the expected results the manual harness compares against.
@@ -13,6 +13,7 @@ and provider-request surfaces, plus the expected results the manual harness comp
 | :--- | :--- |
 | `*.json` | Discovery documents (valid/invalid) and broker metadata fixtures. |
 | `attestations/*.jwt` | Contract G compact JWS fixtures. |
+| `attestation-sources/*.json` | A `{ status, body }` stand-in for an `attestation.uri` HTTP response (v1.3.0 source documents and typed broker failures). |
 | `receipts/*.jwt` | Contract E v1.2 compact JWS fixtures. |
 | `abuse/*.jwt` | Contract D.2 compact JWS fixtures. |
 | `status/*.jwt` | Contract I status compact JWS fixtures. |
@@ -35,9 +36,9 @@ pnpm sign:fixtures          # tsx src/dev/sign-fixtures.ts
 git diff --exit-code fixtures/   # must be clean
 ```
 
-`pnpm sign:fixtures` also refreshes `rp_attestation` inside the discovery fixtures that declare
-`__fixture_attestation_source`, so the published field and the standalone attestation fixture cannot
-drift.
+`pnpm sign:fixtures` also regenerates the `attestation-sources/*.json` responses that carry a signed
+JWT and the one removed-field discovery fixture, so no checked-in JWS is hand-edited. The typed broker
+error responses (403/404/410/503) carry no JWT and are hand-maintained JSON.
 
 ### The seed is not a credential
 
@@ -52,10 +53,13 @@ Three fixture-only top-level fields are used and are warning-level unknown field
 
 - `__fixture_note` — a human note explaining the expected result. Never protocol surface.
 - `__fixture_origin` — the origin the validator should treat as the **fetch origin** in file mode, so
-  `rp.origin` binding can be checked without a network fetch. Real runs should validate the URL; a
-  file without a declared origin reports `unavailable` / `origin_unverifiable` rather than falsely
-  `verified`.
-- `__fixture_attestation_source` — the attestation file the signer copies into `rp_attestation`.
+  source-host binding and `rp.origin` binding can be checked without a network fetch. Real runs should
+  validate the URL; a fixture without a declared origin reports the provider binding as unchecked
+  (`attestation_binding_unchecked`) and the attestation as `unavailable` / `origin_unverifiable`,
+  never `verified`.
+- `__fixture_rp_attestation_source` — used by **one** fixture only
+  (`invalid-rp-attestation-removed.json`): the signer copies that JWS into the removed `rp_attestation`
+  field so the conformance failure is proven against an authentic token.
 
 ## Running the harness
 
@@ -64,11 +68,14 @@ pnpm --silent validate:fixtures fixtures/expected.json
 ```
 
 Each row names a `kind` (`discovery`, `attestation`, `receipt`, `abuse`, `status`, `metadata`,
-`provider`), its input path/JWS, optional discovery/verification options, and the expected outcome.
-Discovery rows use the same code as the CLI (`--verify-attestation`, `--require-attestation`,
-`--trusted-rp-broker`, `--jwks`, `--at`). The harness also checks every JWS claim set against its
-checked-in JSON Schema and, for attestations, compares producer mode (closed JSON Schema + strict
-Zod) with verifier mode (known fields only, unknown additive fields ignored).
+`provider`, `source`), its input path/JWS, optional discovery/verification options, and the expected
+outcome. Discovery rows use the same code as the CLI (`--verify-attestation`, `--require-attestation`,
+`--trusted-rp-broker`, `--jwks`, `--at`, `--source-response`). `sourceResponse` points at a
+`{ status, body }` fixture so verification runs offline; a typed broker response is a verification
+result, never a conformance failure. The harness also checks every JWS claim set against its checked-in
+JSON Schema, compares producer mode (closed JSON Schema + strict Zod) with verifier mode (known fields
+only) for attestations, and validates every `200` source body against `attestation-source.schema.json`
+plus `AttestationSourceDocumentSchema`.
 
 A `crossFieldOnly: true` row is valid under the closed JSON Schema but rejected by Zod/verification
 for a rule JSON Schema cannot express (currently: unique `keys[].kid`).
@@ -79,17 +86,41 @@ for a rule JSON Schema cannot express (currently: unique `keys[].kid`).
 
 | Fixture | Expected |
 | :--- | :--- |
-| `valid-minimal.json`, `valid-full.json`, `valid-localhost.json` | conformant, attestation `unverified`, exit `0` |
-| `valid-attested-domain.json` | `verified`, level `domain`, exit `0` (offline, trusted broker, `--at 2026-10-24T00:00:00Z`) |
-| `valid-attested-entity.json` | `verified`, level `entity`, `legal_name` present |
-| `invalid-attestation-malformed.json` (two segments) | conformance failure, exit `1`, no network; `attestation.status` is `not_checked` (`field_malformed`), not `invalid` |
-| `invalid-attestation-oversize.json` (>16384 chars) | conformance failure, exit `1`, no network, `not_checked` |
-| `invalid-attestation-not-string.json` | conformance failure, exit `1`, no network, `not_checked` |
+| `valid-minimal.json`, `valid-full.json`, `valid-localhost.json` | conformant, no `attestation`, `unverified`, exit `0` |
+| `valid-attestation-broker.json` | broker mode: `verified`, mode `broker`, level `domain`, exit `0` (offline source response, trusted broker, `--at 2026-10-24T00:00:00Z`) |
+| `valid-attestation-provider.json` | provider mode on the discovery origin: `verified`, mode `provider`, exit `0` |
+| `valid-attestation-broker.json` without `--verify-attestation` | conformant, `not_checked`, exit `0` |
+| `invalid-attestation-mode.json` (`mode: "embedded"`) | conformance failure, exit `1`, `field.attestation.mode` / `attestation_mode_invalid`; `attestation.status` is `not_checked`, not `invalid` |
+| `invalid-attestation-uri-relative.json`, `invalid-attestation-uri-http.json` | conformance failure, exit `1`, `field.attestation.uri` / `attestation_uri_invalid` |
+| `invalid-attestation-not-object.json` (`attestation` is a string) | conformance failure, exit `1`, `not_checked` / `field_malformed` |
+| `invalid-attestation-broker-host.json` | conformance failure, exit `1`, `field.attestation.binding` / `attestation_uri_host_untrusted`; the URI is never fetched |
+| `invalid-attestation-provider-host.json` | conformance failure, exit `1`, `field.attestation.binding` / `attestation_uri_host_unbound` |
+| `invalid-rp-attestation-removed.json` | conformance failure, exit `1`, `field.rp_attestation` / `rp_attestation_removed` |
+| `unverifiable-attestation-no-origin.json` (no `__fixture_origin`) | conformant; binding `skip` / `attestation_binding_unchecked`; `unavailable` / `origin_unverifiable`, exit `0` |
+| `valid-attestation-broker.json` with a typed response | `403` → `suspended` / `provider_suspended`; `404` → `unverified` / `attestation_not_found`; `410` → `invalid` / `attestation_revoked`; `503` → `unavailable` / `broker_unavailable`; all exit `0` without `--require-attestation` and remain conformant |
+| `valid-attestation-expired.json` | `expired` / `attestation_expired`, exit `0`; exit `1` with `--require-attestation` (at 2026-11-30) |
+| `valid-attestation-broker.json` with no trusted broker | `attested_untrusted_broker`, exit `0`; exit `1` with `--require-attestation` |
+| `valid-attestation-broker.json` with a missing JWKS | `unavailable` / `rp_broker_unavailable`, exit `0`; exit `2` with `--require-attestation` |
+| `valid-attestation-provider.json` with a wrapped token or a raw JWT body | `invalid` / `source_document_invalid`; only `{ "attestation": "<compact JWS>" }` is accepted |
 | `invalid-json-body.json` (deliberately truncated JSON) | conformance failure, exit `1`, `conformance.evaluated: true`, no `fetchFailure` |
 | `does-not-exist.json` (path only, no file) | operational failure, exit `2`, `conformance.valid: null`, `evaluated: false`, error under `fetchFailure` |
-| `valid-attestation-expired.json` | `expired` warning, exit `0`; exit `1` with `--require-attestation` (at 2026-11-30) |
-| `valid-attested-unavailable.json` | `unavailable`, exit `0`; exit `2` with `--require-attestation` |
-| Untrusted broker (`valid-attested-domain.json` with no trusted flag) | `attested_untrusted_broker`, exit `0`; exit `1` with `--require-attestation` |
+
+Full broker/provider requests in a live run use the same flags without `--source-response`:
+`--verify-attestation --trusted-rp-broker <origin> --jwks <pinned-jwks> --at <rfc3339>`.
+
+### Attestation sources (`attestation-sources/`)
+
+| Fixture | Body | Expected |
+| :--- | :--- | :--- |
+| `ok-broker.json`, `ok-provider.json` | `{ "attestation": "<valid-domain JWS>" }` | valid source document (mode-independent) |
+| `ok-expired.json` | `{ "attestation": "<expired JWS>" }` | valid source document; verification reports `expired` at a later clock |
+| `ok-wrapped-token.json` | `{ "token": "<JWS>" }` | invalid: the source field is `attestation`, not `token` |
+| `ok-raw-jwt-body.json` | `"<JWS>"` | invalid: a raw JWT body is not a source document |
+| `forbidden-403-provider-suspended.json` | typed `403` body | verification `suspended` |
+| `not-found-404-attestation-not-found.json` | typed `404` body | verification `unverified` |
+| `gone-410-attestation-revoked.json` | typed `410` body | verification `invalid` / `attestation_revoked` |
+| `unavailable-503-broker-unavailable.json` | typed `503` body | verification `unavailable` |
+
 
 ### Contract G attestations (`attestations/`)
 

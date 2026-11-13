@@ -1,0 +1,8 @@
+{
+  "status": 503,
+  "body": {
+    "error": "broker_unavailable",
+    "error_description": "The broker cannot serve the attestation right now",
+    "code": "broker_unavailable"
+  }
+}

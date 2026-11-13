@@ -1,0 +1,8 @@
+{
+  "status": 403,
+  "body": {
+    "error": "provider_suspended",
+    "error_description": "Provider or origin suspended",
+    "code": "provider_suspended"
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "$comment": "Expected results for the manual fixture harness (`pnpm validate:fixtures`). Regenerate JWS fixtures with `pnpm sign:fixtures`; this file is hand-maintained. A `crossFieldOnly: true` attestation row is valid under the closed JSON Schema but rejected by Zod for a cross-field rule JSON Schema cannot express (here: unique keys[].kid).",
+  "$comment": "Expected results for the manual fixture harness (`pnpm validate:fixtures`). Regenerate JWS fixtures with `pnpm sign:fixtures`; this file is hand-maintained. A `crossFieldOnly: true` attestation row is valid under the closed JSON Schema but rejected by Zod for a cross-field rule JSON Schema cannot express (here: unique keys[].kid). Discovery rows may assert `checks` (check id -> status or {status, reason}), `failCheck`, `mode`, and `attestation.reason`; `sourceResponse` points at a `{ status, body }` fixture so no run needs a live broker or provider.",
   "clock": "2026-10-24T00:00:00Z",
   "defaults": {
     "trustedBrokers": [
@@ -19,8 +19,16 @@
       "expect": {
         "exitCode": 0,
         "status": "unverified",
+        "reason": "absent",
         "conformance": true,
-        "verified": false
+        "evaluated": true,
+        "verified": false,
+        "checks": {
+          "field.attestation.mode": "skip",
+          "field.attestation.uri": "skip",
+          "field.attestation.binding": "skip",
+          "field.rp_attestation": "skip"
+        }
       }
     },
     {
@@ -52,38 +60,6 @@
       }
     },
     {
-      "id": "discovery/valid-attested-domain",
-      "kind": "discovery",
-      "path": "fixtures/valid-attested-domain.json",
-      "options": {
-        "verifyAttestation": true,
-        "requireAttestation": true
-      },
-      "expect": {
-        "exitCode": 0,
-        "status": "verified",
-        "level": "domain",
-        "conformance": true,
-        "verified": true
-      }
-    },
-    {
-      "id": "discovery/valid-attested-entity",
-      "kind": "discovery",
-      "path": "fixtures/valid-attested-entity.json",
-      "options": {
-        "verifyAttestation": true,
-        "requireAttestation": true
-      },
-      "expect": {
-        "exitCode": 0,
-        "status": "verified",
-        "level": "entity",
-        "conformance": true,
-        "verified": true
-      }
-    },
-    {
       "id": "discovery/valid-minimal--verify-absent",
       "kind": "discovery",
       "path": "fixtures/valid-minimal.json",
@@ -93,69 +69,480 @@
       "expect": {
         "exitCode": 0,
         "status": "unverified",
+        "reason": "absent",
         "conformance": true,
         "evaluated": true,
         "verified": false,
-        "warningsInclude": "rp_attestation is absent"
+        "warningsInclude": "attestation is absent"
       }
     },
     {
-      "id": "discovery/invalid-attestation-malformed",
+      "id": "discovery/valid-attestation-broker--verified",
       "kind": "discovery",
-      "path": "fixtures/invalid-attestation-malformed.json",
+      "path": "fixtures/valid-attestation-broker.json",
+      "options": {
+        "verifyAttestation": true,
+        "requireAttestation": true,
+        "sourceResponse": "fixtures/attestation-sources/ok-broker.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "verified",
+        "reason": null,
+        "mode": "broker",
+        "sourceUri": "https://rp-broker.example/api/broker/provider-verification?origin=https%3A%2F%2Fvaporcloud.example&audience=vaporcloud",
+        "level": "domain",
+        "conformance": true,
+        "verified": true,
+        "checks": {
+          "field.attestation.mode": "pass",
+          "field.attestation.uri": "pass",
+          "field.attestation.binding": "pass",
+          "schema.zod": "pass",
+          "schema.json-schema": "pass"
+        }
+      }
+    },
+    {
+      "id": "discovery/valid-attestation-provider--verified",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-provider.json",
+      "options": {
+        "verifyAttestation": true,
+        "requireAttestation": true,
+        "sourceResponse": "fixtures/attestation-sources/ok-provider.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "verified",
+        "reason": null,
+        "mode": "provider",
+        "sourceUri": "https://vaporcloud.example/.well-known/agent-rp-attestation.json",
+        "level": "domain",
+        "conformance": true,
+        "verified": true,
+        "checks": {
+          "field.attestation.mode": "pass",
+          "field.attestation.uri": "pass",
+          "field.attestation.binding": "pass",
+          "schema.json-schema": "pass"
+        }
+      }
+    },
+    {
+      "id": "discovery/valid-attestation-broker--not-verified",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-broker.json",
+      "options": {
+        "verifyAttestation": false,
+        "sourceResponse": "fixtures/attestation-sources/ok-broker.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "not_checked",
+        "reason": "not_checked",
+        "mode": "broker",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/invalid-attestation-mode",
+      "kind": "discovery",
+      "path": "fixtures/invalid-attestation-mode.json",
       "options": {
         "verifyAttestation": false
       },
       "expect": {
         "exitCode": 1,
         "status": "not_checked",
+        "reason": "field_malformed",
         "conformance": false,
         "evaluated": true,
-        "verified": false
+        "verified": false,
+        "failCheck": "field.attestation.mode",
+        "checks": {
+          "field.attestation.mode": {
+            "status": "fail",
+            "reason": "attestation_mode_invalid"
+          },
+          "field.attestation.binding": "skip",
+          "schema.json-schema": "pass"
+        }
       }
     },
     {
-      "id": "discovery/invalid-attestation-malformed--verify",
+      "id": "discovery/invalid-attestation-uri-relative",
       "kind": "discovery",
-      "path": "fixtures/invalid-attestation-malformed.json",
+      "path": "fixtures/invalid-attestation-uri-relative.json",
+      "options": {
+        "verifyAttestation": false
+      },
+      "expect": {
+        "exitCode": 1,
+        "conformance": false,
+        "evaluated": true,
+        "failCheck": "field.attestation.uri",
+        "checks": {
+          "field.attestation.uri": {
+            "status": "fail",
+            "reason": "attestation_uri_invalid"
+          },
+          "schema.json-schema": "pass"
+        }
+      }
+    },
+    {
+      "id": "discovery/invalid-attestation-uri-http",
+      "kind": "discovery",
+      "path": "fixtures/invalid-attestation-uri-http.json",
+      "options": {
+        "verifyAttestation": false
+      },
+      "expect": {
+        "exitCode": 1,
+        "conformance": false,
+        "evaluated": true,
+        "failCheck": "field.attestation.uri",
+        "checks": {
+          "field.attestation.uri": {
+            "status": "fail",
+            "reason": "attestation_uri_invalid"
+          }
+        }
+      }
+    },
+    {
+      "id": "discovery/invalid-attestation-not-object",
+      "kind": "discovery",
+      "path": "fixtures/invalid-attestation-not-object.json",
+      "options": {
+        "verifyAttestation": false
+      },
+      "expect": {
+        "exitCode": 1,
+        "status": "not_checked",
+        "reason": "field_malformed",
+        "conformance": false,
+        "evaluated": true,
+        "failCheck": "field.attestation.mode",
+        "checks": {
+          "schema.json-schema": "pass"
+        }
+      }
+    },
+    {
+      "id": "discovery/invalid-attestation-broker-host",
+      "kind": "discovery",
+      "path": "fixtures/invalid-attestation-broker-host.json",
       "options": {
         "verifyAttestation": true
       },
       "expect": {
         "exitCode": 1,
         "status": "not_checked",
+        "reason": "binding_failed",
         "conformance": false,
         "evaluated": true,
-        "verified": false
+        "verified": false,
+        "failCheck": "field.attestation.binding",
+        "checks": {
+          "field.attestation.binding": {
+            "status": "fail",
+            "reason": "attestation_uri_host_untrusted"
+          }
+        }
       }
     },
     {
-      "id": "discovery/invalid-attestation-oversize",
+      "id": "discovery/invalid-attestation-provider-host",
       "kind": "discovery",
-      "path": "fixtures/invalid-attestation-oversize.json",
+      "path": "fixtures/invalid-attestation-provider-host.json",
       "options": {
-        "verifyAttestation": false
+        "verifyAttestation": true
       },
       "expect": {
         "exitCode": 1,
         "status": "not_checked",
+        "reason": "binding_failed",
         "conformance": false,
         "evaluated": true,
+        "verified": false,
+        "failCheck": "field.attestation.binding",
+        "checks": {
+          "field.attestation.binding": {
+            "status": "fail",
+            "reason": "attestation_uri_host_unbound"
+          }
+        }
+      }
+    },
+    {
+      "id": "discovery/invalid-rp-attestation-removed",
+      "kind": "discovery",
+      "path": "fixtures/invalid-rp-attestation-removed.json",
+      "options": {
+        "verifyAttestation": true
+      },
+      "expect": {
+        "exitCode": 1,
+        "status": "unverified",
+        "reason": "absent",
+        "conformance": false,
+        "evaluated": true,
+        "verified": false,
+        "failCheck": "field.rp_attestation",
+        "checks": {
+          "field.rp_attestation": {
+            "status": "fail",
+            "reason": "rp_attestation_removed"
+          },
+          "schema.json-schema": "pass"
+        }
+      }
+    },
+    {
+      "id": "discovery/unverifiable-attestation-no-origin",
+      "kind": "discovery",
+      "path": "fixtures/unverifiable-attestation-no-origin.json",
+      "options": {
+        "verifyAttestation": true,
+        "sourceResponse": "fixtures/attestation-sources/ok-provider.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "unavailable",
+        "reason": "origin_unverifiable",
+        "mode": "provider",
+        "conformance": true,
+        "verified": false,
+        "checks": {
+          "field.attestation.binding": {
+            "status": "skip",
+            "reason": "attestation_binding_unchecked"
+          }
+        }
+      }
+    },
+    {
+      "id": "discovery/broker-403-suspended",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-broker.json",
+      "options": {
+        "verifyAttestation": true,
+        "sourceResponse": "fixtures/attestation-sources/forbidden-403-provider-suspended.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "suspended",
+        "reason": "provider_suspended",
+        "mode": "broker",
+        "conformance": true,
         "verified": false
       }
     },
     {
-      "id": "discovery/invalid-attestation-not-string",
+      "id": "discovery/broker-403-suspended--require",
       "kind": "discovery",
-      "path": "fixtures/invalid-attestation-not-string.json",
+      "path": "fixtures/valid-attestation-broker.json",
       "options": {
-        "verifyAttestation": false
+        "verifyAttestation": true,
+        "requireAttestation": true,
+        "sourceResponse": "fixtures/attestation-sources/forbidden-403-provider-suspended.json"
       },
       "expect": {
         "exitCode": 1,
-        "status": "not_checked",
-        "conformance": false,
-        "evaluated": true,
+        "status": "suspended",
+        "reason": "provider_suspended",
+        "conformance": true
+      }
+    },
+    {
+      "id": "discovery/broker-404-not-found",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-broker.json",
+      "options": {
+        "verifyAttestation": true,
+        "sourceResponse": "fixtures/attestation-sources/not-found-404-attestation-not-found.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "unverified",
+        "reason": "attestation_not_found",
+        "mode": "broker",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/broker-410-revoked",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-broker.json",
+      "options": {
+        "verifyAttestation": true,
+        "sourceResponse": "fixtures/attestation-sources/gone-410-attestation-revoked.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "invalid",
+        "reason": "attestation_revoked",
+        "mode": "broker",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/broker-503-unavailable",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-broker.json",
+      "options": {
+        "verifyAttestation": true,
+        "sourceResponse": "fixtures/attestation-sources/unavailable-503-broker-unavailable.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "unavailable",
+        "reason": "broker_unavailable",
+        "mode": "broker",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/valid-attestation-expired--warn",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-expired.json",
+      "options": {
+        "verifyAttestation": true,
+        "at": "2026-11-30T00:00:00Z",
+        "sourceResponse": "fixtures/attestation-sources/ok-expired.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "expired",
+        "reason": "attestation_expired",
+        "mode": "broker",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/valid-attestation-expired--require",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-expired.json",
+      "options": {
+        "verifyAttestation": true,
+        "requireAttestation": true,
+        "at": "2026-11-30T00:00:00Z",
+        "sourceResponse": "fixtures/attestation-sources/ok-expired.json"
+      },
+      "expect": {
+        "exitCode": 1,
+        "status": "expired",
+        "reason": "attestation_expired",
+        "conformance": true
+      }
+    },
+    {
+      "id": "discovery/broker-untrusted",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-broker.json",
+      "options": {
+        "verifyAttestation": true,
+        "trustedBrokers": [],
+        "sourceResponse": "fixtures/attestation-sources/ok-broker.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "attested_untrusted_broker",
+        "reason": "rp_broker_untrusted",
+        "mode": "broker",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/broker-untrusted--require",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-broker.json",
+      "options": {
+        "verifyAttestation": true,
+        "requireAttestation": true,
+        "trustedBrokers": [],
+        "sourceResponse": "fixtures/attestation-sources/ok-broker.json"
+      },
+      "expect": {
+        "exitCode": 1,
+        "status": "attested_untrusted_broker",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/broker-jwks-missing--warn",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-broker.json",
+      "options": {
+        "verifyAttestation": true,
+        "jwks": "fixtures/keys/does-not-exist.json",
+        "sourceResponse": "fixtures/attestation-sources/ok-broker.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "unavailable",
+        "reason": "rp_broker_unavailable",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/broker-jwks-missing--require",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-broker.json",
+      "options": {
+        "verifyAttestation": true,
+        "requireAttestation": true,
+        "jwks": "fixtures/keys/does-not-exist.json",
+        "sourceResponse": "fixtures/attestation-sources/ok-broker.json"
+      },
+      "expect": {
+        "exitCode": 2,
+        "status": "unavailable",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/provider-wrapped-token",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-provider.json",
+      "options": {
+        "verifyAttestation": true,
+        "sourceResponse": "fixtures/attestation-sources/ok-wrapped-token.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "invalid",
+        "reason": "source_document_invalid",
+        "mode": "provider",
+        "conformance": true,
+        "verified": false
+      }
+    },
+    {
+      "id": "discovery/provider-raw-jwt-body",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-provider.json",
+      "options": {
+        "verifyAttestation": true,
+        "sourceResponse": "fixtures/attestation-sources/ok-raw-jwt-body.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "invalid",
+        "reason": "source_document_invalid",
+        "mode": "provider",
+        "conformance": true,
         "verified": false
       }
     },
@@ -186,99 +573,6 @@
         "status": "unverified",
         "conformance": null,
         "evaluated": false,
-        "verified": false
-      }
-    },
-    {
-      "id": "discovery/valid-attestation-expired--warn",
-      "kind": "discovery",
-      "path": "fixtures/valid-attestation-expired.json",
-      "options": {
-        "verifyAttestation": true,
-        "at": "2026-11-30T00:00:00Z"
-      },
-      "expect": {
-        "exitCode": 0,
-        "status": "expired",
-        "conformance": true,
-        "verified": false
-      }
-    },
-    {
-      "id": "discovery/valid-attestation-expired--require",
-      "kind": "discovery",
-      "path": "fixtures/valid-attestation-expired.json",
-      "options": {
-        "verifyAttestation": true,
-        "requireAttestation": true,
-        "at": "2026-11-30T00:00:00Z"
-      },
-      "expect": {
-        "exitCode": 1,
-        "status": "expired",
-        "conformance": true,
-        "verified": false
-      }
-    },
-    {
-      "id": "discovery/valid-attested-unavailable--warn",
-      "kind": "discovery",
-      "path": "fixtures/valid-attested-unavailable.json",
-      "options": {
-        "verifyAttestation": true,
-        "jwks": "fixtures/keys/does-not-exist.json"
-      },
-      "expect": {
-        "exitCode": 0,
-        "status": "unavailable",
-        "conformance": true,
-        "verified": false
-      }
-    },
-    {
-      "id": "discovery/valid-attested-unavailable--require",
-      "kind": "discovery",
-      "path": "fixtures/valid-attested-unavailable.json",
-      "options": {
-        "verifyAttestation": true,
-        "requireAttestation": true,
-        "jwks": "fixtures/keys/does-not-exist.json"
-      },
-      "expect": {
-        "exitCode": 2,
-        "status": "unavailable",
-        "conformance": true,
-        "verified": false
-      }
-    },
-    {
-      "id": "discovery/untrusted-broker--warn",
-      "kind": "discovery",
-      "path": "fixtures/valid-attested-domain.json",
-      "options": {
-        "verifyAttestation": true,
-        "trustedBrokers": []
-      },
-      "expect": {
-        "exitCode": 0,
-        "status": "attested_untrusted_broker",
-        "conformance": true,
-        "verified": false
-      }
-    },
-    {
-      "id": "discovery/untrusted-broker--require",
-      "kind": "discovery",
-      "path": "fixtures/valid-attested-domain.json",
-      "options": {
-        "verifyAttestation": true,
-        "requireAttestation": true,
-        "trustedBrokers": []
-      },
-      "expect": {
-        "exitCode": 1,
-        "status": "attested_untrusted_broker",
-        "conformance": true,
         "verified": false
       }
     },
@@ -730,6 +1024,56 @@
       "path": "fixtures/provider/attestation-issuance.json",
       "expect": {
         "valid": true
+      }
+    },
+    {
+      "id": "source/ok-broker",
+      "kind": "source",
+      "path": "fixtures/attestation-sources/ok-broker.json",
+      "expect": {
+        "schema": true,
+        "zod": true,
+        "valid": true
+      }
+    },
+    {
+      "id": "source/ok-provider",
+      "kind": "source",
+      "path": "fixtures/attestation-sources/ok-provider.json",
+      "expect": {
+        "schema": true,
+        "zod": true,
+        "valid": true
+      }
+    },
+    {
+      "id": "source/ok-expired",
+      "kind": "source",
+      "path": "fixtures/attestation-sources/ok-expired.json",
+      "expect": {
+        "schema": true,
+        "zod": true,
+        "valid": true
+      }
+    },
+    {
+      "id": "source/ok-wrapped-token",
+      "kind": "source",
+      "path": "fixtures/attestation-sources/ok-wrapped-token.json",
+      "expect": {
+        "schema": false,
+        "zod": false,
+        "valid": false
+      }
+    },
+    {
+      "id": "source/ok-raw-jwt-body",
+      "kind": "source",
+      "path": "fixtures/attestation-sources/ok-raw-jwt-body.json",
+      "expect": {
+        "schema": false,
+        "zod": false,
+        "valid": false
       }
     }
   ]

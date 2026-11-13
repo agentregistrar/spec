@@ -1,0 +1,8 @@
+{
+  "status": 404,
+  "body": {
+    "error": "attestation_not_found",
+    "error_description": "No active attestation for this origin and audience",
+    "code": "attestation_not_found"
+  }
+}

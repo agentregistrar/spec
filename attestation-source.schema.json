@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.agentregistrar.dev/agent-identity/v1/attestation-source.schema.json",
+  "title": "Agent Identity attestation source document",
+  "description": "The v1.3.0 attestation source document served at the discovery `attestation.uri` in both modes. Frozen shape: { \"attestation\": \"<compact JWS>\" } with Content-Type application/json. Additional fields are ignored by conformant clients; producers should not add private, agent, or human data. A raw JWT body is not accepted. The JWS is a Contract G `agent-rp-attestation+jwt` whose format is unchanged. Normative definition: agent-identity-v1.md §14. Kept in lockstep with `AttestationSourceDocumentSchema` in this package (Zod is the source of truth).",
+  "type": "object",
+  "required": ["attestation"],
+  "additionalProperties": true,
+  "properties": {
+    "attestation": {
+      "description": "The compact Contract G attestation JWS (`typ: agent-rp-attestation+jwt`). The client verifies it against the issuer JWKS; it never treats this string as trusted input.",
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 16384,
+      "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+    }
+  }
+}

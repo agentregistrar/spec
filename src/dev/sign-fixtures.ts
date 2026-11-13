@@ -12,9 +12,10 @@
  * `iat` produce byte-identical JWS. After running this script,
  * `git diff --exit-code fixtures/` MUST be clean.
  *
- * It also refreshes `rp_attestation` inside the discovery fixtures that declare
- * a `__fixture_attestation_source`, so the published field and the standalone
- * attestation fixture can never drift.
+ * It also refreshes the single removed-field discovery fixture from
+ * `__fixture_rp_attestation_source` and regenerates the attestation-source
+ * documents that carry a signed JWT (v1.3.0), so no checked-in JWS is ever
+ * hand-edited.
  */
 import { createHash, createPrivateKey, createPublicKey, sign } from "node:crypto";
 import type { KeyObject, JsonWebKey as NodeJsonWebKey } from "node:crypto";
@@ -456,6 +457,38 @@ async function main(): Promise<void> {
     await writeText(join(attestations, name), jws);
   }
 
+  // v1.3.0 attestation-source responses. Both modes serve the same
+  // `{ attestation }` document. These 200 responses carry a signed JWT, so they
+  // are generated here rather than hand-edited; the typed broker error
+  // responses (403/404/410/503) carry no JWT and are hand-maintained JSON.
+  const jwsByName = new Map(attestationFiles);
+  const validDomainJws = jwsByName.get("valid-domain.jwt");
+  const expiredJws = jwsByName.get("expired.jwt");
+  if (validDomainJws === undefined || expiredJws === undefined) {
+    throw new Error("the attestation fixtures required by the source documents are missing");
+  }
+  const sourceDir = join(FIXTURES, "attestation-sources");
+  await writeJson(join(sourceDir, "ok-broker.json"), {
+    status: 200,
+    body: { attestation: validDomainJws },
+  });
+  await writeJson(join(sourceDir, "ok-provider.json"), {
+    status: 200,
+    body: { attestation: validDomainJws },
+  });
+  await writeJson(join(sourceDir, "ok-expired.json"), {
+    status: 200,
+    body: { attestation: expiredJws },
+  });
+  await writeJson(join(sourceDir, "ok-wrapped-token.json"), {
+    status: 200,
+    body: { token: validDomainJws },
+  });
+  await writeJson(join(sourceDir, "ok-raw-jwt-body.json"), {
+    status: 200,
+    body: validDomainJws,
+  });
+
   const receiptFiles: [string, string][] = [
     [
       "valid-receipt.jwt",
@@ -651,10 +684,12 @@ async function main(): Promise<void> {
     await writeText(join(abuseDir, name), jws);
   }
 
-  // Refresh the discovery `rp_attestation` field from the standalone fixture so
-  // the two can never drift. Only documents that declare a source are touched.
-  // A deliberately unparseable discovery fixture (the malformed-JSON conformance
-  // row) is skipped: it is not a document and is never signed.
+  // v1.3.0 removed `rp_attestation` from discovery. Exactly one fixture
+  // (`invalid-rp-attestation-removed.json`) still carries it to prove the
+  // conformance failure; the signer copies the historical JWS there so the
+  // removed field is authentic rather than hand-edited. A deliberately
+  // unparseable discovery fixture (the malformed-JSON row) is skipped: it is not
+  // a document and is never signed.
   const topLevel = await readdir(FIXTURES);
   let refreshed = 0;
   for (const name of topLevel) {
@@ -668,7 +703,7 @@ async function main(): Promise<void> {
     } catch {
       continue;
     }
-    const source = document.__fixture_attestation_source;
+    const source = document.__fixture_rp_attestation_source;
     if (typeof source !== "string") {
       continue;
     }
@@ -685,7 +720,8 @@ async function main(): Promise<void> {
       `  receipts:     ${receiptFiles.length}`,
       `  status:       ${statusFiles.length}`,
       `  abuse:        ${abuseFiles.length}`,
-      `  discovery documents refreshed from __fixture_attestation_source: ${refreshed}`,
+      "  attestation-source 200 responses: 5",
+      `  discovery documents refreshed from __fixture_rp_attestation_source: ${refreshed}`,
       "  next: git diff --exit-code fixtures/",
     ].join("\n"),
   );

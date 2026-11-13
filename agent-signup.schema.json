@@ -49,13 +49,23 @@
       "type": "string",
       "format": "date-time"
     },
-    "rp_attestation": {
-      "description": "OPTIONAL Contract G RP attestation: a compact JWS signed by the RP's broker (typ agent-rp-attestation+jwt). Presence changes no other field. The attestation `rp.origin` MUST equal the origin of the discovery document actually fetched (never provider_url or terms.url) and `rp.audience` MUST equal `audience`. Absence is conformant and means unverified. A malformed value is a conformance error; a well-formed JWS that fails verification is a verification error, not a conformance error. Normative rules: agent-identity-v1.md §5.2, §5.4, and §14.",
-      "type": "string",
-      "minLength": 5,
-      "maxLength": 16384,
-      "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+    "attestation": {
+      "description": "OPTIONAL v1.3 attestation publication source. `mode` is `broker` (the broker's stable verification route) or `provider` (a provider-hosted source document). `uri` is a stable absolute URL: HTTPS, no userinfo, no fragment; `http://localhost` / `http://127.0.0.1` is the development exception. A `broker` URI origin MUST be a trusted broker origin and appear in `issuer_allowlist`; a `provider` URI origin MUST be the discovery origin or a subdomain of it. Host binding is enforced by the validator, not by this pattern. Absence is conformant and means unverified. The source document is `{ \"attestation\": \"<compact JWS>\" }` (attestation-source.schema.json). Normative rules: agent-identity-v1.md §5.4 and §14.",
+      "type": "object",
+      "required": ["mode", "uri"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "description": "Attestation publication mode. Exactly `broker` or `provider`; there are no aliases and no compatibility mode.",
+          "enum": ["broker", "provider"]
+        },
+        "uri": {
+          "description": "Stable absolute source URL. It is not a signed URL and carries no per-request value.",
+          "$ref": "#/$defs/attestationSourceUri"
+        }
+      }
     },
+    "rp_attestation": false,
     "issuer_allowlist": {
       "description": "Non-empty, unique list of absolute issuer origins accepted by this RP. No path, query, fragment, or wildcard.",
       "type": "array",
@@ -134,6 +144,12 @@
       "type": "string",
       "minLength": 1,
       "pattern": "^(?:https://\\S+|http://(?:localhost|127\\.0\\.0\\.1)(?::\\d+)?(?:/\\S*)?)$"
+    },
+    "attestationSourceUri": {
+      "description": "Absolute HTTPS URL with no userinfo and no fragment (the `http://localhost` / `http://127.0.0.1` development exception applies). Query strings are allowed: the broker verification route carries `origin` and `audience`.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:https://[^/?#@\\s]+(?:[/?][^#\\s]*)?|http://(?:localhost|127\\.0\\.0\\.1)(?::\\d+)?(?:[/?][^#\\s]*)?)$"
     },
     "issuerOrigin": {
       "description": "Absolute issuer origin with no path, query, fragment, or wildcard. HTTPS unless localhost development.",

@@ -5,9 +5,8 @@
  * verifier, and the fixture harness so no two copies can drift.
  */
 
-/** `rp_attestation` in discovery is a compact JWS capped at 16 KiB (spec §5.3). */
+/** A compact attestation JWS is capped at 16 KiB in the source document (spec §5.3/§14). */
 export const ATTESTATION_FIELD_MAX_LENGTH = 16384;
-
 /** A compact JWS: exactly three base64url segments separated by `.`. */
 export const COMPACT_JWS_PATTERN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 

@@ -136,7 +136,7 @@ export type FetchOutcome =
       finalUrl: string;
       redirects: number;
     }
-  | { ok: false; kind: FetchFailureKind; message: string };
+  | { ok: false; kind: FetchFailureKind; message: string; status?: number };
 
 export interface FetchOptions {
   timeoutMs: number;
@@ -276,6 +276,7 @@ export async function fetchResource(
         return {
           ok: false,
           kind: "status",
+          status: response.status,
           message: `expected status ${options.acceptStatus ? "an accepted value" : "200"} but received ${response.status}`,
         };
       }

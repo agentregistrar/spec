@@ -37,12 +37,19 @@ import {
 } from "./constants";
 import { fetchResource, isRecord, normalizeOrigin } from "./http";
 import {
+  AttestationSourceDocumentSchema,
   BrokerMetadataSchema,
   parseRpAttestationVerifier,
+  type AttestationMode,
   type RpAttestationClaims,
 } from "./schema";
 
-/** Statuses the validator itself can emit. `suspended` comes from the broker. */
+/**
+ * Statuses the validator itself can emit. `suspended` is the broker-managed
+ * status check (a typed `403 provider_suspended`); `attested_untrusted_broker`
+ * means the issuer is outside the trusted list; `not_checked` means the caller
+ * did not ask for verification or the field was malformed.
+ */
 export type AttestationVerificationStatus =
   | "verified"
   | "unverified"
@@ -50,6 +57,7 @@ export type AttestationVerificationStatus =
   | "invalid"
   | "expired"
   | "unavailable"
+  | "suspended"
   | "not_checked";
 
 export type AttestationCheckStatus = "pass" | "fail" | "warn" | "skip";
@@ -88,11 +96,17 @@ export interface AttestationVerificationResult {
   verified: boolean;
   status: AttestationVerificationStatus;
   reason: string | null;
+  /** Publication mode of the source, or `null` when the document is absent/unparsed. */
+  mode: AttestationMode | null;
+  /** The discovery `attestation.uri` the token came from, or `null`. */
+  source_uri: string | null;
   iss: string | null;
   jti: string | null;
   origin: string | null;
   audience: string | null;
   level: string | null;
+  /** Attestation `exp` in epoch seconds when the claims parsed, else `null`. */
+  expires_at: number | null;
   checked_at: string;
   jwks_source: string | null;
   checks: AttestationCheck[];
@@ -434,11 +448,14 @@ function emptyResult(
     verified: false,
     status: "unverified",
     reason: "absent",
+    mode: null,
+    source_uri: null,
     iss: null,
     jti: null,
     origin: null,
     audience: null,
     level: null,
+    expires_at: null,
     checked_at: new Date(now * 1000).toISOString(),
     jwks_source: null,
     checks: [],
@@ -476,9 +493,12 @@ function isTrustedIssuer(issuer: string, trustedBrokers: readonly string[]): boo
 }
 
 /**
- * Verifies the optional `rp_attestation` field of a discovery document.
+ * Verifies the compact attestation JWS. This is the pure JWT path: it never
+ * fetches the source and never changes semantics with the publication mode.
+ * The v1.3.0 source-document entry point {@link verifyRpAttestationSource}
+ * wraps it and adds the mode-aware checks.
  *
- * `attestation` is the raw field value (or `undefined` when absent). The
+ * `attestation` is the compact JWS string (or `undefined` when absent). The
  * function never throws; every outcome is a status plus a stable reason.
  */
 export async function verifyRpAttestation(
@@ -490,12 +510,12 @@ export async function verifyRpAttestation(
   const result = emptyResult(options, now);
 
   if (attestation === undefined || attestation === null) {
-    push(result, "field.present", "skip", "no rp_attestation field (optional; document is unverified)");
-    // An absent optional field is never a failure, but a run that explicitly
+    push(result, "field.present", "skip", "no attestation source (optional; document is unverified)");
+    // An absent optional source is never a failure, but a run that explicitly
     // asked for verification must say out loud that there was nothing to verify.
     if (options.check) {
       result.warnings.push(
-        "rp_attestation is absent; the document is unverified (no attestation to verify; exit unchanged)",
+        "attestation is absent; the document is unverified (no source to verify; exit unchanged)",
       );
     }
     return result;
@@ -503,32 +523,32 @@ export async function verifyRpAttestation(
 
   result.present = true;
 
-  // A malformed field is a **conformance** error, not a verification verdict
-  // (spec §5.3/§19.1): there is no JWS to verify. The document check fails the
+  // A malformed source is a **conformance** error, not a verification verdict
+  // (spec §5.4/§19.1): there is no JWS to verify. The document check fails the
   // run with exit 1; the attestation result reports `not_checked` rather than
   // mislabelling a non-token as `invalid`.
   if (typeof attestation !== "string") {
-    push(result, "field.present", "pass", "rp_attestation is present");
-    push(result, "field.format", "fail", "rp_attestation must be a string");
+    push(result, "field.present", "pass", "an attestation source is present");
+    push(result, "field.format", "fail", "attestation must be a compact JWS string");
     result.status = "not_checked";
     result.reason = "field_malformed";
     return result;
   }
   if (attestation.length > 16_384 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(attestation)) {
-    push(result, "field.present", "pass", "rp_attestation is present");
+    push(result, "field.present", "pass", "an attestation source is present");
     push(
       result,
       "field.format",
       "fail",
-      "rp_attestation must be three unpadded base64url segments separated by `.` and at most 16384 characters",
+      "attestation must be three unpadded base64url segments separated by `.` and at most 16384 characters",
     );
     result.status = "not_checked";
     result.reason = "field_malformed";
     return result;
   }
 
-  push(result, "field.present", "pass", "rp_attestation is present");
-  push(result, "field.format", "pass", "rp_attestation is a compact JWS within the size bound");
+  push(result, "field.present", "pass", "an attestation source is present");
+  push(result, "field.format", "pass", "the source token is a compact JWS within the size bound");
 
   if (!options.check) {
     result.status = "not_checked";
@@ -591,6 +611,7 @@ export async function verifyRpAttestation(
   result.origin = claims.rp.origin;
   result.audience = claims.rp.audience;
   result.level = claims.rp.verification.level;
+  result.expires_at = claims.exp;
   push(
     result,
     "claims",
@@ -748,3 +769,109 @@ export async function verifyRpAttestation(
 
 /** Exposed for callers that need the audience label without importing constants. */
 export const ATTESTATION_AUDIENCE = PROTOCOL_AUDIENCE;
+
+// ---------------------------------------------------------------------------
+// Attestation source document (v1.3.0; F1 frozen 2026-11-10).
+// ---------------------------------------------------------------------------
+
+/** A mode-aware verification context: which source produced the token. */
+export interface AttestationSourceContext extends AttestationVerificationContext {
+  /** Publication mode from discovery (`broker` or `provider`). */
+  mode: AttestationMode | null;
+  /** The `attestation.uri` that was fetched (or injected), verbatim. */
+  sourceUri: string | null;
+}
+
+export type AttestationSourceDocumentResult =
+  | { ok: true; attestation: string }
+  | { ok: false; reason: string; message: string };
+
+/**
+ * Parses the source document `{ "attestation": "<compact JWS>" }` (F1).
+ * Additional fields are ignored. A raw JWT body, a missing field, or a
+ * non-compact value is rejected with the stable reason
+ * `source_document_invalid` and never reaches JWT verification.
+ */
+export function readAttestationSourceDocument(value: unknown): AttestationSourceDocumentResult {
+  const parsed = AttestationSourceDocumentSchema.safeParse(value);
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+      .join("; ");
+    return {
+      ok: false,
+      reason: "source_document_invalid",
+      message: `the source document must be { "attestation": "<compact JWS>" } (${issues})`,
+    };
+  }
+  return { ok: true, attestation: parsed.data.attestation };
+}
+
+/**
+ * Verifies one attestation source document. `document` is the parsed JSON body
+ * of the `attestation.uri` response (or an injected fixture response body).
+ *
+ * The JWT checks are exactly {@link verifyRpAttestation}; this entry point only
+ * adds the mode-aware layer:
+ *
+ * - a malformed source document is `invalid` / `source_document_invalid`;
+ * - in `broker` mode the JWT `iss` origin MUST equal the source URI origin, so a
+ *   token signed by a different (even trusted) broker cannot be served from
+ *   this source (`invalid` / `attestation_issuer_mismatch`).
+ *
+ * Callers select the source and enforce host binding *before* calling this;
+ * an untrusted or unbound URI is never fetched.
+ */
+export async function verifyRpAttestationSource(
+  document: unknown,
+  context: AttestationSourceContext,
+  options: AttestationVerificationOptions,
+): Promise<AttestationVerificationResult> {
+  const parsed = readAttestationSourceDocument(document);
+  if (!parsed.ok) {
+    const now = options.at ?? Math.floor(Date.now() / 1000);
+    const result = emptyResult(options, now);
+    result.present = true;
+    result.checked = options.check;
+    result.mode = context.mode;
+    result.source_uri = context.sourceUri;
+    result.checks.push({
+      id: "attestation.source_document",
+      status: "fail",
+      message: parsed.message,
+    });
+    return failWith(result, "invalid", parsed.reason, parsed.message);
+  }
+
+  const result = await verifyRpAttestation(parsed.attestation, context, options);
+  result.mode = context.mode;
+  result.source_uri = context.sourceUri;
+
+  if (
+    context.mode === "broker" &&
+    context.sourceUri !== null &&
+    result.status === "verified"
+  ) {
+    const sourceOrigin = normalizeOrigin(new URL(context.sourceUri).origin);
+    if (normalizeOrigin(result.iss ?? "") !== sourceOrigin) {
+      result.checks.push({
+        id: "attestation.source_issuer",
+        status: "fail",
+        message: `iss ${result.iss ?? "(none)"} does not equal the broker source origin ${sourceOrigin}`,
+      });
+      return failWith(
+        result,
+        "invalid",
+        "attestation_issuer_mismatch",
+        `the attestation issuer does not equal the broker source origin ${sourceOrigin}`,
+      );
+    }
+    result.checks.push({
+      id: "attestation.source_issuer",
+      status: "pass",
+      message: `iss equals the broker source origin (${sourceOrigin})`,
+    });
+  }
+
+  return result;
+}

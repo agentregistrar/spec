@@ -12,6 +12,7 @@
       "default": "./src/index.ts"
     },
     "./agent-signup.schema.json": "./agent-signup.schema.json",
+    "./attestation-source.schema.json": "./attestation-source.schema.json",
     "./rp-attestation.schema.json": "./rp-attestation.schema.json",
     "./broker-metadata.schema.json": "./broker-metadata.schema.json",
     "./attestation-status.schema.json": "./attestation-status.schema.json",
@@ -22,6 +23,7 @@
   "files": [
     "src",
     "agent-signup.schema.json",
+    "attestation-source.schema.json",
     "rp-attestation.schema.json",
     "broker-metadata.schema.json",
     "attestation-status.schema.json",

@@ -1,0 +1,8 @@
+{
+  "status": 410,
+  "body": {
+    "error": "attestation_revoked",
+    "error_description": "The attestation or provider is revoked",
+    "code": "attestation_revoked"
+  }
+}
