@@ -203,7 +203,7 @@ the `<…>` placeholders once hosting exists. In-repo, the link targets are
 
 | Artifact | Location |
 | :--- | :--- |
-| Specification (`v1.3.1`) | [`../agent-identity-v1.md`](../agent-identity-v1.md) |
+| Specification (`v1.3.2`) | [`../agent-identity-v1.md`](../agent-identity-v1.md) |
 | Scope boundaries rulebook | [`../scope-boundaries.md`](../scope-boundaries.md) |
 | Conformance + attestation validator guide | [`../validator.md`](../validator.md) |
 | Registry schema | [`./implementations.schema.json`](./implementations.schema.json) |

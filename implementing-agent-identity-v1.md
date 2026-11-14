@@ -205,10 +205,11 @@ pnpm --silent validate:discovery https://your-service.example/.well-known/agent-
 ```
 
 Exit codes: `0` valid / no required check failed, `1` conformance or required-verification failure
-(including a body that is not valid JSON), `2` could not obtain what the run needed (document or
-JWKS) — an operational result with no conformance verdict (`DOCUMENT: NOT CHECKED`). The validator
-rejects vendor capability fields at any depth (including under `extensions`) and recomputes the ToS
-hash. A validator-passing document is the objective entry criterion for the implementation registry.
+(including a body that is not valid JSON), `2` could not obtain what the run needed (the document, a
+JWKS, or the attestation source) — an operational result with no conformance verdict
+(`DOCUMENT: NOT CHECKED`). The validator rejects vendor capability fields at any depth (including
+under `extensions`) and recomputes the ToS hash. A validator-passing document is the objective entry
+criterion for the implementation registry.
 
 Conformance and attestation verification are separate. Once you publish an `attestation` source by
 either mode, verify it offline in CI against a pinned broker JWKS:
@@ -226,9 +227,9 @@ the conformance verdict still passes; with it, anything but `verified` fails (an
 `2`). A typed broker `403`/`404`/`410` is a verification result, not a conformance failure: a
 suspended, unknown, or revoked state does not make your discovery document non-conformant.
 
-The validator is the source-first package `@agentregistrar/discovery` (`1.3.1`, **Apache-2.0**). Run it
+The validator is the source-first package `@agentregistrar/discovery` (`1.3.2`, **Apache-2.0**). Run it
 from a clone of this specification repository, or use the pinned git dependency
-(`github:agentregistrar/spec#v1.3.1`) once the tag exists. There is no `bin` entry — always invoke it
+(`github:agentregistrar/spec#v1.3.2`) once the tag exists. There is no `bin` entry — always invoke it
 with `pnpm validate:discovery`.
 
 To test both modes without a live broker, use the checked-in fixtures and the fixture-only
@@ -265,9 +266,11 @@ under `--verify-attestation`.
 
 ## 8. Adoption / registry conventions
 
-The current specification release is **`v1.3.1`** (2026-11-13), a contract-text patch on **`v1.3.0`**,
-the breaking discovery-carrier release — see [`release-notes-v1.3.1.md`](./release-notes-v1.3.1.md)
-and [`release-notes-v1.3.0.md`](./release-notes-v1.3.0.md). Earlier releases: **`v1.2.0`** (2026-10-24,
+The current specification release is **`v1.3.2`** (2026-11-14), a documentation-correction patch on
+**`v1.3.1`** (contract-text corrections), itself a patch on **`v1.3.0`**, the breaking
+discovery-carrier release — see [`release-notes-v1.3.2.md`](./release-notes-v1.3.2.md),
+[`release-notes-v1.3.1.md`](./release-notes-v1.3.1.md), and
+[`release-notes-v1.3.0.md`](./release-notes-v1.3.0.md). Earlier releases: **`v1.2.0`** (2026-10-24,
 [`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md)), **`v1.1.0`**
 (2026-10-18, [`release-notes-v1.1.0.md`](./release-notes-v1.1.0.md)) and the initial **`v1.0.0`**
 (2026-10-17, [`release-notes-v1.0.0.md`](./release-notes-v1.0.0.md)). The adoption surface is
@@ -365,7 +368,10 @@ You host the source document and renew the token yourself through Contract H.
 1. Opt in to provider-managed for the origin and register the **stable** source URL. It must be HTTPS
    (localhost development exception), with no userinfo and no fragment.
 2. The URL host must be the origin serving discovery or a **subdomain** of it. A third-party CDN host
-   is rejected by the validator and by conformant clients.
+   is rejected by the validator and by conformant clients. If your attestation is issued by a broker
+   other than the one that mints agent assertions for your service, that broker's origin must also
+   appear in `issuer_allowlist`; `issuer_allowlist` is a single list, so adding a broker for the
+   attestation host binding also accepts that broker's agent assertions.
 3. Obtain or renew the token with `POST /api/provider/v1/attestation` (§15.3) and write the returned
    `attestation` JWS into `{ "attestation": "<JWS>" }` at that URL, served as `application/json`.
 4. Renew on the **12-hour target** against the 24-hour expiry so one missed cycle is tolerable. Keep

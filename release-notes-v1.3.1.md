@@ -13,8 +13,9 @@ published `v1.3.0` text left out, so the text now matches the already-decided D1
 1. **Contract H attestation issuance is not plan-gated.** `v1.3.0` still said issuance required
    `plan:"verified"` with a live subscription and that a `free` provider could not issue. D18 F6
    removes the `attestation` entitlement entirely. Issuance now requires provider `status:"active"`,
-   origin `status:"verified"`, and at least one `active` key; `provider_not_eligible` reports those
-   state failures, not a plan.
+   origin `status:"verified"`, and at least one `active` key. A non-active provider or non-verified
+   origin is `403 provider_not_eligible`; issuance with no `active` key is `409 no_active_key`
+   (§15.5). Neither is a plan signal.
 2. **The client policy contract is `no_verify`/`verify`/`strict`.** `v1.3.0` still normatively said
    `RpPolicy` was `allow`/`warn`/`require`/`block`, defaulted to `warn`, and had an `enforced` field.
    D18 F4 replaces those values with `no_verify`, `verify` (default), and `strict`; `blocked` is a
@@ -30,7 +31,7 @@ normative text. `1.3.1` gives them an explicit version to repin.
 
 | Section | Correction |
 | :--- | :--- |
-| §15.3 Attestation issuance and renewal | Removed the `plan:"verified"` / live-subscription requirement and the "free provider cannot issue" sentence. Issuance requires `status:"active"`, a `verified` origin, and an `active` key; `provider_not_eligible` is not a plan signal. Lifetime, per-origin 24/day limit, `renewed_from_jti`, GET-latest behavior, and the 12-hour renewal target are unchanged. |
+| §15.3 Attestation issuance and renewal | Removed the `plan:"verified"` / live-subscription requirement and the "free provider cannot issue" sentence. Issuance requires `status:"active"`, a `verified` origin, and an `active` key. A non-active provider or non-verified origin is `403 provider_not_eligible`; a missing `active` key is `409 no_active_key` (§15.5), not a plan signal. Lifetime, per-origin 24/day limit, `renewed_from_jti`, GET-latest behavior, and the 12-hour renewal target are unchanged. |
 | §15.4 Account lifecycle | Removed the "free plan has no attestation entitlement" sentence. Other lifecycle facts are unchanged; receipts, abuse standing, verified listing, and entity review are not described as ungated. |
 | §17.2 Resolution order | Default policy is `verify`. |
 | §17.3 Policy modes | `RpPolicy` is exactly `no_verify`/`verify`/`strict`. `no_verify` never gates; `verify` accepts both publication modes; `strict` requires broker-managed and rejects provider-managed with `rp_attestation_mode_not_allowed`; `blocked=true` rejects with `rp_blocked` before any source fetch. The status-to-code mapping is unchanged. `enforced` and `warn` are removed. |

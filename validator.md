@@ -1,10 +1,10 @@
 # Discovery Conformance and Attestation Validator (`agent-identity-v1`)
 
 - **Source:** `src/validate-discovery.ts` — run with `pnpm validate:discovery`.
-- **Package:** `@agentregistrar/discovery` `1.3.1`, licensed **Apache-2.0**. It is self-contained and
-  source-first: `pnpm install` from a clean clone, then run the CLI. The `v1.3.1` tag publishes it to
+- **Package:** `@agentregistrar/discovery` `1.3.2`, licensed **Apache-2.0**. It is self-contained and
+  source-first: `pnpm install` from a clean clone, then run the CLI. The `v1.3.2` tag publishes it to
   npm. Run it from this repository, or after the tag exists use the pinned git dependency
-  (`github:agentregistrar/spec#v1.3.1`). There is no `bin` entry — invoke it with
+  (`github:agentregistrar/spec#v1.3.2`). There is no `bin` entry — invoke it with
   `pnpm validate:discovery`.
 - **Normative references:** [`agent-identity-v1.md`](./agent-identity-v1.md),
   [`scope-boundaries.md`](./scope-boundaries.md).
@@ -83,12 +83,13 @@ codes).
 
 **File mode and the attestation binding.** Attestation verification binds `rp.origin` to the origin of
 the document the verifier actually fetched. A local file has no fetch origin, so a fixture declares it
-with `__fixture_origin` (for example `"https://vaporcloud.example"`). Without a declared origin:
+with `__fixture_origin` (for example `"https://vaporcloud.example"`). Without a declared origin, the
+source token is `unavailable` with reason `origin_unverifiable` in **either** mode — never `verified`.
+Within that outcome:
 
-- a `provider` source binding is `skip` with reason `attestation_binding_unchecked`, and the
-  attestation is `unavailable` with reason `origin_unverifiable` — never `verified`; and
-- a `broker` source binding is still checked, because `issuer_allowlist` is in the document and does
-  not need a fetch origin; a supplied trusted broker list is applied the same way.
+- a `provider` source binding is also `skip` with reason `attestation_binding_unchecked`; and
+- a `broker` source binding is still enforced from the document's `issuer_allowlist` (and the
+  configured trusted-broker list), because that check does not need a fetch origin.
 
 `__fixture_origin` is fixture-only metadata: it is not protocol surface, real runs should validate the
 URL, and it never substitutes for the fetch origin when the URL is validated. A `provider` URI on the
@@ -197,7 +198,7 @@ Exit status is the contract; the JSON is evidence. The v1.3.0 additions:
 ```json
 {
   "validator": "agent-identity-v1",
-  "validatorVersion": "1.3.1",
+  "validatorVersion": "1.3.2",
   "valid": true,
   "exitCode": 0,
   "conformance": { "valid": true, "evaluated": true, "errors": [], "warnings": [] },
@@ -403,7 +404,7 @@ unparseable. `--json` emits `{valid, exitCode, errors, warnings}`.
 | Field | Type | Notes |
 | :--- | :--- | :--- |
 | `validator` | string | Always `"agent-identity-v1"`. |
-| `validatorVersion` | string | The `VALIDATOR_VERSION` constant, `"1.3.1"`. |
+| `validatorVersion` | string | The `VALIDATOR_VERSION` constant, `"1.3.2"`. |
 | `mode` | `"file"` \| `"url"` | How the document was obtained. |
 | `source` | string | The path or URL that was validated. |
 | `valid` | boolean | `true` iff `exitCode === 0` (the run result). |

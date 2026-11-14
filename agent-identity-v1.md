@@ -1,9 +1,9 @@
 # Agent Identity Relying Party Discovery v1 (`agent-signup.json`)
 
-- **Status:** Normative specification — `v1.3.1`. Maintained in [`agentregistrar/spec`](https://github.com/agentregistrar/spec).
+- **Status:** Normative specification — `v1.3.2`. Maintained in [`agentregistrar/spec`](https://github.com/agentregistrar/spec).
 - **Protocol identifier:** `agent-identity-v1`
 - **Well-known URI:** `GET /.well-known/agent-signup.json`
-- **Version:** `v1.3.1` (see §1.3)
+- **Version:** `v1.3.2` (see §1.3)
 - **Companion document:** [`scope-boundaries.md`](./scope-boundaries.md) — the identity-vs-vendor boundary and the future-change review checklist.
 
 This document is the single normative definition of the `agent-signup.json` discovery contract and the
@@ -39,6 +39,7 @@ scope.
 
 | Version | Date | Change |
 | :--- | :--- | :--- |
+| `v1.3.2` | 2026-11-14 | **Documentation correction only.** Fixes two normative contradictions in the `v1.3.1` text: issuance with no active key is `409 no_active_key`, not `403 provider_not_eligible`; and the "binding unchecked" rule applies to a `provider` source without a fetch origin, while a `broker` source is always checked from `issuer_allowlist`. No wire format, schema, validator behavior, fixture, or attestation claim changes. |
 | `v1.3.1` | 2026-11-13 | **Contract-text correction only.** Makes the published normative text match the D18 decisions that `v1.3.0` shipped without: Contract H attestation issuance is not plan-, billing-, or subscription-gated, and the client policy contract is `no_verify`/`verify`/`strict` with a separate `blocked` action and a `verify` default. No wire format, schema, validator behavior, fixture, or attestation claim changes. |
 | `v1.3.0` | 2026-11-13 | **Breaking discovery change.** The embedded `rp_attestation` field is removed and replaced by one OPTIONAL `attestation` object (`mode`: `broker` \| `provider`, `uri` naming a stable attestation source). A document that still carries `rp_attestation` is non-conformant; there is no compatibility field, embedded fallback, or dual publication. The attestation JWT, claims, signature, key snapshot, 24-hour lifetime, origin/audience binding, and the Contract F receipt/abuse bodies are unchanged. The wire protocol id stays `agent-identity-v1`. |
 | `v1.2.0` | 2026-10-24 | Adds Contracts G/H/I, optional `rp_attestation`, authenticated D.2, RP-signed E, authenticated F, the trust model, assurance levels, verification rules, and the status/error taxonomy. **The wire protocol id stays `agent-identity-v1`; `rp_attestation` is OPTIONAL and `v1.0.0`/`v1.1.0` documents remain conformant.** Superseded by `v1.3.0`, which removes `rp_attestation` from discovery: a `v1.2.0` document is no longer conformant. |
@@ -97,11 +98,22 @@ policy-adjacent wording, and the scope rulebook with those decisions. The change
 already-decided D18 contract; no attestation claim, discovery field, reason code, or check id changes.
 See [`release-notes-v1.3.1.md`](./release-notes-v1.3.1.md).
 
+**Release record (`v1.3.2`).** `v1.3.2` is a **documentation-correction** patch on `v1.3.1`, shipped
+under `protocol` `agent-identity-v1` with **no** wire, schema, fixture, or validator-behavior change.
+It resolves two normative contradictions in the published text: §15.3 now splits a non-active
+provider / non-verified origin (`403 provider_not_eligible`) from a missing active key
+(`409 no_active_key`, §15.5), and §14.2 step 2 now scopes the unchecked-binding rule to a `provider`
+source while keeping the `broker` host binding enforced from `issuer_allowlist`. It also clarifies the
+file-mode binding note, the skip annotation in the reason table, the exit-`2` enumeration, the
+producer-revision label in `rp-attestation.schema.json`, and adds a provider note that a second
+attestation broker must appear in `issuer_allowlist`. See
+[`release-notes-v1.3.2.md`](./release-notes-v1.3.2.md).
+
 ### 1.3 Version identity
 
 - The protocol version is carried **major-only** in the discovery document's `protocol` field:
   `agent-identity-v1`.
-- This specification revision is `v1.3.1`. Minor/patch revisions are additive and do not change
+- This specification revision is `v1.3.2`. Minor/patch revisions are additive and do not change
   the `protocol` value; breaking changes require a new `protocol` value and a new discovery path (§13).
   `v1.3.0` breaks the **discovery document** shape while the signup handshake and assertion/attestation
   wire formats stay `agent-identity-v1`: the removed `rp_attestation` field was OPTIONAL, its
@@ -1007,9 +1019,11 @@ Verification is normative and ordered. Steps 1–2 are conformance; steps 3–11
 2. **Check the host binding before any fetch.** A `broker` URI origin **MUST** be in
    `issuer_allowlist` and, when a trusted broker list is configured, a trusted broker origin; otherwise
    `attestation_uri_host_untrusted`. A `provider` URI origin **MUST** be the discovery origin or a
-   subdomain of it; otherwise `attestation_uri_host_unbound`. A verifier with no fetch origin (a local
-   file) reports the binding as **unchecked**, never as a pass. A failed binding is final: the URI is
-   never fetched.
+   subdomain of it; otherwise `attestation_uri_host_unbound`. A `provider` source has no fetch origin
+   when the document is a local file, so that binding is reported as **unchecked**, never as a pass. A
+   `broker` source binding does not depend on a fetch origin: it is always enforced from the
+   document's `issuer_allowlist` and, when configured, the verifier's trusted-broker list. A failed
+   binding is final: the URI is never fetched.
 3. **Fetch and parse the source document.** `GET attestation.uri` under the bounded-fetch rules of
    §14.4, require `application/json`, and read the `attestation` string. A raw JWT body, a different
    envelope key, an oversize body, or a non-JSON body is `invalid` with reason
@@ -1233,13 +1247,13 @@ returns `201`:
 Issuance requires provider `status:"active"`, origin `status:"verified"`, and at least one `active`
 key. Attestation is **not** gated on plan, billing, or subscription in v1.3: a `free` or otherwise
 unsubscribed provider that meets those conditions can issue and renew. A provider that is not
-`active`, an origin that is not `verified`, or a provider with no `active` key receives
-`403 code:"provider_not_eligible"`; in v1.3 `provider_not_eligible` reports those state failures, not
-a plan or upgrade requirement. A new `jti` is minted per issuance; `exp = iat + 86400`;
-`renewed_from_jti` is `null` on a first issuance and the previous `jti` on a renewal; there is no
-minimum renewal interval; the limit is 24 issuances/day/origin. `GET ?origin=&audience=` returns the
-latest attestation by `(issued_at desc, created_at desc, id desc)`, or `404
-code:"attestation_not_found"`.
+`active` or an origin that is not `verified` receives `403 code:"provider_not_eligible"`; issuance
+with no `active` key receives `409 code:"no_active_key"` (§15.5). In v1.3 `provider_not_eligible`
+reports those state failures, not a plan or upgrade requirement. A new `jti` is minted per issuance;
+`exp = iat + 86400`; `renewed_from_jti` is `null` on a first issuance and the previous `jti` on a
+renewal; there is no minimum renewal interval; the limit is 24 issuances/day/origin.
+`GET ?origin=&audience=` returns the latest attestation by
+`(issued_at desc, created_at desc, id desc)`, or `404 code:"attestation_not_found"`.
 
 The normal renewal target is **12 hours** against a 24-hour expiry: one missed cycle is tolerable and
 expiry is the primary revocation bound.
@@ -1568,7 +1582,7 @@ MUST NOT be renamed without a contract decision.
 | :--- | :--- |
 | `field.attestation.mode` | `attestation_mode_invalid` |
 | `field.attestation.uri` | `attestation_uri_invalid` |
-| `field.attestation.binding` | `attestation_uri_host_untrusted` (broker) \| `attestation_uri_host_unbound` (provider) \| `attestation_binding_unchecked` (skip: no fetch origin) |
+| `field.attestation.binding` | `attestation_uri_host_untrusted` (broker) \| `attestation_uri_host_unbound` (provider) \| `attestation_binding_unchecked` (skip; provider mode with no fetch origin) |
 | `field.rp_attestation` | `rp_attestation_removed` |
 
 Verification reasons: `absent`, `not_checked`, `field_malformed`, `binding_failed`,
