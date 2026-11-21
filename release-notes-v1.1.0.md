@@ -3,7 +3,7 @@
 - **Protocol identifier:** `agent-identity-v1`
 - **Specification version:** `v1.1.0`
 - **Release date:** 2026-10-18
-- **Normative specification:** [`agent-identity-v1.md`](./agent-identity-v1.md)
+- **Normative specification:** [`agent-identity-v1.md`](./agent-identity-protocol.md)
 - **Change process:** [`release-notes-v1.0.0.md`](./release-notes-v1.0.0.md) §3
 
 `v1.1.0` is an **additive, text-only** revision of the `agent-identity-v1` discovery contract. It adds
@@ -128,9 +128,9 @@ version tracks the specification version.
 ## 7. Related artifacts
 
 - Rendered release notes and changelog: <https://docs.agentregistrar.dev/agent-identity/v1/changelog/>
-- Normative spec: [`agent-identity-v1.md`](./agent-identity-v1.md)
+- Normative spec: [`agent-identity-v1.md`](./agent-identity-protocol.md)
 - Scope rulebook: [`scope-boundaries.md`](./scope-boundaries.md)
-- Implementation guide: [`implementing-agent-identity-v1.md`](./implementing-agent-identity-v1.md)
+- Implementation guide: [`implementing-agent-identity-v1.md`](./implementing-agent-identity-protocol.md)
 - Validator guide: [`validator.md`](./validator.md)
 - Registry: [`registry/README.md`](./registry/README.md),
   [`registry/implementations.json`](./registry/implementations.json)

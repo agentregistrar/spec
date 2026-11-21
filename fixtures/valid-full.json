@@ -1,6 +1,7 @@
 {
-  "protocol": "agent-identity-v1",
-  "spec": "https://github.com/agentregistrar/spec/blob/v1.1.0/agent-identity-v1.md",
+  "protocol": "agent-identity-protocol",
+  "protocol_version": "2.0",
+  "spec": "https://github.com/agentregistrar/spec/blob/v2.1.0/agent-identity-protocol.md",
   "audience": "vaporcloud",
   "provider_name": "VaporCloud",
   "provider_url": "https://vaporcloud.example",

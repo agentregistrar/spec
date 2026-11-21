@@ -1,7 +1,7 @@
 # Identity vs Vendor Scope Boundaries
 
 - **Status:** Normative scope rulebook. Companion to
-  [`agent-identity-v1.md`](./agent-identity-v1.md).
+  [`agent-identity-protocol.md`](./agent-identity-protocol.md).
 
 This document is the rulebook the identity protocol must satisfy. It states what the identity protocol
 owns, what the vendor owns, and the checklist any future change must pass before a new protocol field
@@ -165,7 +165,7 @@ Additional gates:
       API usage.
 - [ ] The change is not a vendor capability hidden under `extensions`.
 - [ ] The change is additive within v1, or it introduces a new `protocol` value and path.
-- [ ] The change does not weaken any security consideration in `agent-identity-v1.md` §20.
+- [ ] The change does not weaken any security consideration in `agent-identity-protocol.md` §20.
 - [ ] The change is reflected consistently in the spec, the schema, the JSON Schema, the validator, and
       the reference implementation.
 
@@ -194,7 +194,7 @@ definitions, the implementation guide, or the registry.
 
 ## 9. Authority & Escalation
 
-- `agent-identity-v1.md` is the normative protocol specification; this document is the normative scope
+- `agent-identity-protocol.md` is the normative protocol specification; this document is the normative scope
   boundary. Where a proposed change is tempted to widen protocol surface, this document governs.
 - The conformance validator is the objective enforcement mechanism; a document that advertises vendor
   capability fields is **not** conformant.

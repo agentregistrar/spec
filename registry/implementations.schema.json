@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://docs.agentregistrar.dev/agent-identity/v1/registry-implementations.schema.json",
-  "title": "agent-identity-v1 implementation registry",
-  "description": "Validates registry/implementations.json. This is a registry artifact, not a second public protocol surface: it describes adoption (which discovery documents pass the conformance validator and, optionally, which providers a broker has verified). Conformance and verification are separate. The optional `verification` object is a snapshot taken at `checked_at`; absence means conformant and unverified. A verified badge renders only when `status` is `active` at `checked_at`, so a later suspension or revocation does not rewrite the static entry until a new check is recorded. Normative definition: registry/README.md and agent-identity-v1.md §19.",
+  "$id": "https://docs.agentregistrar.dev/protocol/registry-implementations.schema.json",
+  "title": "Agent Identity Protocol implementation registry",
+  "description": "Validates registry/implementations.json. This is a registry artifact, not a second public protocol surface: it describes adoption (which discovery documents pass the conformance validator and, optionally, which providers a broker has verified). Conformance and verification are separate. The optional `verification` object is a snapshot taken at `checked_at`; absence means conformant and unverified. A verified badge renders only when `status` is `active` at `checked_at`, so a later suspension or revocation does not rewrite the static entry until a new check is recorded. Normative definition: registry/README.md and agent-identity-protocol.md §19.",
   "type": "object",
   "additionalProperties": true,
   "required": [
@@ -22,7 +22,7 @@
       "type": "string"
     },
     "protocol": {
-      "const": "agent-identity-v1"
+      "const": "agent-identity-protocol"
     },
     "spec": {
       "type": "string",
@@ -51,7 +51,7 @@
       "required": ["id", "version", "script", "run"],
       "properties": {
         "id": {
-          "const": "agent-identity-v1"
+          "const": "agent-identity-protocol"
         },
         "version": {
           "type": "string",
@@ -137,7 +137,7 @@
           "pattern": "^\\S+$"
         },
         "protocol": {
-          "const": "agent-identity-v1"
+          "const": "agent-identity-protocol"
         },
         "capabilities": {
           "type": "array",

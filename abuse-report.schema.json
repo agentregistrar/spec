@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://docs.agentregistrar.dev/agent-identity/v1/abuse-report.schema.json",
-  "title": "Agent Identity RP abuse report claims (agent-rp-abuse+jwt)",
-  "description": "Contract D.2 (v1.2) authenticated abuse report claims. Header: {alg: EdDSA, typ: agent-rp-abuse+jwt, kid}. Signed by an RP key that is present in the accompanying attestation `keys[]` with `abuse` in purposes. `exp - iat` MUST equal exactly 300 seconds and the broker accepts the report only within [iat - 60s, exp]; the five-minute freshness bound is never extended. Reports are current events (unlike receipts, which are historical facts) and are idempotent on `jti`. Normative definition: agent-identity-v1.md §11.",
+  "$id": "https://docs.agentregistrar.dev/protocol/abuse-report.schema.json",
+  "title": "Agent Identity Protocol RP abuse report claims (agent-rp-abuse+jwt)",
+  "description": "Contract D.2 authenticated abuse report claims. Header: {alg: EdDSA, typ: agent-rp-abuse+jwt, kid}. Signed by an RP key that is present in the accompanying attestation `keys[]` with `abuse` in purposes. `exp - iat` MUST equal exactly 300 seconds and the broker accepts the report only within [iat - 60s, exp]; the five-minute freshness bound is never extended. Reports are current events (unlike receipts, which are historical facts) and are idempotent on `jti`. Normative definition: agent-identity-protocol.md §11.",
   "type": "object",
   "additionalProperties": false,
   "required": ["iss", "aud", "jti", "iat", "exp", "agent_id", "reason"],

@@ -3,8 +3,8 @@
  *
  * Published by a relying party at `GET /.well-known/agent-signup.json` and
  * consumed by agents to drive brokered signup. The normative definition lives in
- * `agent-identity-v1.md`; this Zod schema is the canonical implementation
- * source of truth for that identity-only v1 document. Consumers (the private
+ * `agent-identity-protocol.md`; this Zod schema is the canonical implementation
+ * source of truth for that identity-only discovery document. Consumers (the private
  * monorepo, future npm users of `@agentregistrar/discovery`) depend on this
  * package, so the public copy here is authoritative.
  *
@@ -36,6 +36,7 @@ import {
   KEY_ID_PATTERN,
   MAX_ATTESTATION_KEYS,
   PROTOCOL_AUDIENCE,
+  PROTOCOL_NAME,
   PROTOCOL_VERSION,
   RECEIPT_JTI_PATTERN,
   UUID_PATTERN,
@@ -222,7 +223,8 @@ const iso8601Timestamp = z
  */
 export const AgentSignupDiscoverySchema = z
   .object({
-    protocol: z.literal("agent-identity-v1"),
+    protocol: z.literal(PROTOCOL_NAME),
+    protocol_version: z.literal(PROTOCOL_VERSION),
 
     audience,
     provider_name: z.string().min(1),

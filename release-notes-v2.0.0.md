@@ -3,7 +3,7 @@
 - **Protocol identifier:** `agent-identity-v1` (unchanged)
 - **Specification version:** `v2.0.0` (breaking spec/package release)
 - **Release date:** 2026-11-21
-- **Normative specification:** [`agent-identity-v1.md`](./agent-identity-v1.md)
+- **Normative specification:** [`agent-identity-v1.md`](./agent-identity-protocol.md)
 - **Previous release:** [`release-notes-v1.3.2.md`](./release-notes-v1.3.2.md)
 
 `v2.0.0` simplifies two surfaces that added friction without adding trust. The `protocol` id, the
@@ -155,8 +155,8 @@ exists) and follow §1 and §2 above.
 
 ## 6. Related artifacts
 
-- Normative spec: [`agent-identity-v1.md`](./agent-identity-v1.md)
-- Implementation guide: [`implementing-agent-identity-v1.md`](./implementing-agent-identity-v1.md)
+- Normative spec: [`agent-identity-v1.md`](./agent-identity-protocol.md)
+- Implementation guide: [`implementing-agent-identity-v1.md`](./implementing-agent-identity-protocol.md)
 - Validator guide: [`validator.md`](./validator.md)
 - Fixture matrix: [`fixtures/README.md`](./fixtures/README.md)
 - Previous release: [`release-notes-v1.3.2.md`](./release-notes-v1.3.2.md)

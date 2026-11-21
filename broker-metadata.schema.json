@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://docs.agentregistrar.dev/agent-identity/v1/broker-metadata.schema.json",
-  "title": "Agent Identity broker metadata (agent-broker.json)",
-  "description": "Contract I: the public document served at GET /.well-known/agent-broker.json. All six fields are REQUIRED and unknown fields are not permitted. `issuer` MUST equal the origin of the document itself and the `iss` of every attestation the broker signs; a differing issuer invalidates the document. `jwks_uri` MUST be same-origin with `issuer` (a cross-field rule enforced by Zod and the validator, not expressible here). Cross-origin `attestation_status_uri`/`abuse_endpoint` are allowed but must pass the same SSRF rules; same-origin is RECOMMENDED. Normative definition: agent-identity-v1.md §16.",
+  "$id": "https://docs.agentregistrar.dev/protocol/broker-metadata.schema.json",
+  "title": "Agent Identity Protocol broker metadata (agent-broker.json)",
+  "description": "Contract I: the public document served at GET /.well-known/agent-broker.json. All six fields are REQUIRED and unknown fields are not permitted. `issuer` MUST equal the origin of the document itself and the `iss` of every attestation the broker signs; a differing issuer invalidates the document. `jwks_uri` MUST be same-origin with `issuer` (a cross-field rule enforced by Zod and the validator, not expressible here). Cross-origin `attestation_status_uri`/`abuse_endpoint` are allowed but must pass the same SSRF rules; same-origin is RECOMMENDED. Normative definition: agent-identity-protocol.md §16.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -31,7 +31,7 @@
       "$ref": "#/$defs/httpsUrl"
     },
     "protocol_versions": {
-      "description": "Non-empty, unique list of protocol versions; MUST contain `agent-identity-v1`.",
+      "description": "Non-empty, unique list of supported Agent Identity Protocol versions; MUST contain `2.0`.",
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
@@ -40,7 +40,7 @@
         "minLength": 1
       },
       "contains": {
-        "const": "agent-identity-v1"
+        "const": "2.0"
       }
     },
     "contact": {

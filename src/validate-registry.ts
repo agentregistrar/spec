@@ -59,7 +59,7 @@ function parseArgs(argv: string[]): RegistryOptions {
 function printHelp(): void {
   console.log(
     [
-      "Implementation Registry Validator (agent-identity-v1)",
+      "Implementation Registry Validator (Agent Identity Protocol)",
       "",
       "Usage:",
       "  pnpm validate:registry [path] [--json]",
@@ -174,7 +174,7 @@ function semanticChecks(registry: Record<string, unknown>): {
 
 function humanResult(result: RegistryResult): string {
   const lines = [
-    "agent-identity-v1 implementation registry validator",
+    "Agent Identity Protocol implementation registry validator",
     "",
     `Registry: ${result.path}`,
     `Schema  : ${SCHEMA_FILE}`,

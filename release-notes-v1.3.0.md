@@ -3,7 +3,7 @@
 - **Protocol identifier:** `agent-identity-v1` (unchanged)
 - **Specification version:** `v1.3.0`
 - **Release date:** 2026-11-13
-- **Normative specification:** [`agent-identity-v1.md`](./agent-identity-v1.md)
+- **Normative specification:** [`agent-identity-v1.md`](./agent-identity-protocol.md)
 - **Change process:** [`release-notes-v1.0.0.md`](./release-notes-v1.0.0.md) §3
 - **Previous release:** [`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md)
 
@@ -235,9 +235,9 @@ handshake and the signed artifacts are unchanged, so the `protocol` id stays `ag
 
 ## 8. Related artifacts
 
-- Normative spec: [`agent-identity-v1.md`](./agent-identity-v1.md)
+- Normative spec: [`agent-identity-v1.md`](./agent-identity-protocol.md)
 - Scope rulebook: [`scope-boundaries.md`](./scope-boundaries.md)
-- Implementation guide: [`implementing-agent-identity-v1.md`](./implementing-agent-identity-v1.md)
+- Implementation guide: [`implementing-agent-identity-v1.md`](./implementing-agent-identity-protocol.md)
 - Validator guide: [`validator.md`](./validator.md)
 - Discovery schema: [`agent-signup.schema.json`](./agent-signup.schema.json)
 - Attestation source schema: [`attestation-source.schema.json`](./attestation-source.schema.json)

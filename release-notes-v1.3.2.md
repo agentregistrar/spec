@@ -3,7 +3,7 @@
 - **Protocol identifier:** `agent-identity-v1` (unchanged)
 - **Specification version:** `v1.3.2` (documentation patch on `v1.3.1`)
 - **Release date:** 2026-11-14
-- **Normative specification:** [`agent-identity-v1.md`](./agent-identity-v1.md)
+- **Normative specification:** [`agent-identity-v1.md`](./agent-identity-protocol.md)
 - **Previous release:** [`release-notes-v1.3.1.md`](./release-notes-v1.3.1.md)
 
 `v1.3.2` corrects documentation only. It changes no wire format, JSON Schema shape, fixture, validator
@@ -89,8 +89,8 @@ Per the repository `AGENTS.md`, the source-first package is published with **npm
 
 ## 5. Related artifacts
 
-- Normative spec: [`agent-identity-v1.md`](./agent-identity-v1.md)
-- Implementation guide: [`implementing-agent-identity-v1.md`](./implementing-agent-identity-v1.md)
+- Normative spec: [`agent-identity-v1.md`](./agent-identity-protocol.md)
+- Implementation guide: [`implementing-agent-identity-v1.md`](./implementing-agent-identity-protocol.md)
 - Validator guide: [`validator.md`](./validator.md)
 - Fixture matrix: [`fixtures/README.md`](./fixtures/README.md)
 - Previous release: [`release-notes-v1.3.1.md`](./release-notes-v1.3.1.md)

@@ -1,9 +1,9 @@
 /**
- * Discovery Conformance Validator (`agent-identity-v1`).
+ * Discovery Conformance Validator (`agent-identity-protocol`).
  *
- * Enforces the objective rule: "a Relying Party claiming `agent-identity-v1`
+ * Enforces the objective rule: "a Relying Party claiming `agent-identity-protocol`
  * support MUST publish a valid discovery document." The normative source of
- * truth is `agent-identity-v1.md` in this repository; the implementation source
+ * truth is `agent-identity-protocol.md` in this repository; the implementation source
  * of truth is `AgentSignupDiscoverySchema` in `./schema.ts`.
  *
  * Run:
@@ -39,6 +39,7 @@ import {
   normalizeOrigin,
   parseAbsoluteHttpUrl,
 } from "./http";
+import { PROTOCOL_NAME, PROTOCOL_VERSION } from "./constants";
 import { loadRootSchema, validateJsonSchema, type SchemaError } from "./json-schema";
 import {
   AgentSignupDiscoverySchema,
@@ -91,6 +92,7 @@ interface Probe {
 
 interface DocumentMetadata {
   protocol: string | null;
+  protocolVersion: string | null;
   audience: string | null;
   providerName: string | null;
   signupEndpoint: string | null;
@@ -296,7 +298,7 @@ function parseArgs(argv: string[]): ParsedOptions {
 
 function printHelp(): void {
   const lines = [
-    "Discovery Conformance Validator (agent-identity-v1)",
+    "Discovery Conformance Validator (Agent Identity Protocol)",
     "",
     "Usage:",
     "  pnpm validate:discovery <url-or-file> [options]",
@@ -451,9 +453,10 @@ function scanForbidden(node: unknown, path: string, out: ForbiddenFinding[]): vo
 // Document checks.
 // ---------------------------------------------------------------------------
 
-/** Top-level fields defined by the identity-only v1 spec (§5.1/§5.2). */
+/** Top-level fields defined by the Agent Identity Protocol spec (§5.1/§5.2). */
 const ALLOWED_TOP_LEVEL_FIELDS = new Set([
   "protocol",
+  "protocol_version",
   "spec",
   "audience",
   "provider_name",
@@ -499,14 +502,31 @@ function formatZodIssue(issue: { path: (string | number)[]; message: string }): 
 
 function checkProtocol(document: Record<string, unknown>): Check {
   const value = document.protocol;
-  if (value === "agent-identity-v1") {
-    return ok("field.protocol", "protocol", "protocol is exactly `agent-identity-v1`");
+  if (value === PROTOCOL_NAME) {
+    return ok("field.protocol", "protocol", `protocol is exactly \`${PROTOCOL_NAME}\``);
   }
   return fail(
     "field.protocol",
     "protocol",
-    `protocol must be exactly "agent-identity-v1" (any other value means unsupported, never best-effort)`,
-    { expected: "agent-identity-v1", actual: JSON.stringify(value ?? null) },
+    `protocol must be exactly "${PROTOCOL_NAME}" (any other value means unsupported, never best-effort)`,
+    { expected: PROTOCOL_NAME, actual: JSON.stringify(value ?? null) },
+  );
+}
+
+function checkProtocolVersion(document: Record<string, unknown>): Check {
+  const value = document.protocol_version;
+  if (value === PROTOCOL_VERSION) {
+    return ok(
+      "field.protocol_version",
+      "protocol_version",
+      `protocol_version is exactly \`${PROTOCOL_VERSION}\``,
+    );
+  }
+  return fail(
+    "field.protocol_version",
+    "protocol_version",
+    `protocol_version must be exactly "${PROTOCOL_VERSION}"`,
+    { expected: PROTOCOL_VERSION, actual: JSON.stringify(value ?? null) },
   );
 }
 
@@ -1463,6 +1483,8 @@ function buildMetadata(document: Record<string, unknown>): DocumentMetadata {
   const endpoints = isRecord(document.endpoints) ? document.endpoints : null;
   return {
     protocol: typeof document.protocol === "string" ? document.protocol : null,
+    protocolVersion:
+      typeof document.protocol_version === "string" ? document.protocol_version : null,
     audience: typeof document.audience === "string" ? document.audience : null,
     providerName: typeof document.provider_name === "string" ? document.provider_name : null,
     signupEndpoint:
@@ -1574,6 +1596,7 @@ async function checkDocument(
   }
 
   addCheck(checks, checkProtocol(document));
+  addCheck(checks, checkProtocolVersion(document));
   addCheck(checks, checkAudience(document));
   addCheck(checks, checkProviderName(document));
   addCheck(checks, checkIssuerAllowlist(document));
@@ -2257,6 +2280,7 @@ function toJson(result: RunResult): Record<string, unknown> {
       warnings: result.attestation.warnings,
     },
     protocol: result.metadata?.protocol ?? null,
+    protocolVersion: result.metadata?.protocolVersion ?? null,
     audience: result.metadata?.audience ?? null,
     providerName: result.metadata?.providerName ?? null,
     signupEndpoint: result.metadata?.signupEndpoint ?? null,
@@ -2305,12 +2329,13 @@ function statusLabel(status: CheckStatus): string {
 
 function printHuman(result: RunResult): void {
   const lines: string[] = [];
-  lines.push(`agent-identity-v1 discovery conformance validator v${VALIDATOR_VERSION}`);
+  lines.push(`Agent Identity Protocol discovery conformance validator v${VALIDATOR_VERSION}`);
   lines.push("");
   lines.push(`Source  : ${result.source}`);
   lines.push(`Mode    : ${result.mode}`);
   if (result.metadata) {
     lines.push(`Protocol: ${result.metadata.protocol ?? "(missing)"}`);
+    lines.push(`Version : ${result.metadata.protocolVersion ?? "(missing)"}`);
     lines.push(`Audience: ${result.metadata.audience ?? "(missing)"}`);
   }
   lines.push("");

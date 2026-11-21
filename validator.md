@@ -1,4 +1,4 @@
-# Discovery Conformance and Attestation Validator (`agent-identity-v1`)
+# Discovery Conformance and Attestation Validator (`agent-identity-protocol`)
 
 - **Source:** `src/validate-discovery.ts` — run with `pnpm validate:discovery`.
 - **Package:** `@agentregistrar/discovery` `2.0.0`, licensed **Apache-2.0**. It is self-contained and
@@ -6,13 +6,13 @@
   npm. Run it from this repository, or after the tag exists use the pinned git dependency
   (`github:agentregistrar/spec#v2.0.0`). There is no `bin` entry — invoke it with
   `pnpm validate:discovery`.
-- **Normative references:** [`agent-identity-v1.md`](./agent-identity-v1.md),
+- **Normative references:** [`agent-identity-protocol.md`](./agent-identity-protocol.md),
   [`scope-boundaries.md`](./scope-boundaries.md).
 - **Related harnesses:** `pnpm validate:fixtures` (standalone JWS/schema matrix) and
   `pnpm validate:registry` (implementation registry) — both in §11.
 
 The validator is the objective mechanism behind the rule “a Relying Party that claims
-`agent-identity-v1` support MUST publish a valid discovery document.” It reports **two independent
+`agent-identity-protocol` support MUST publish a valid discovery document.” It reports **two independent
 results**:
 
 1. **Document conformance** — schema, URL-hosted terms shape, scope boundary, field rules, and the
@@ -200,7 +200,7 @@ Exit status is the contract; the JSON is evidence. The v1.3.0 additions:
 
 ```json
 {
-  "validator": "agent-identity-v1",
+  "validator": "agent-identity-protocol",
   "validatorVersion": "2.0.0",
   "valid": true,
   "exitCode": 0,
@@ -407,7 +407,7 @@ unparseable. `--json` emits `{valid, exitCode, errors, warnings}`.
 
 | Field | Type | Notes |
 | :--- | :--- | :--- |
-| `validator` | string | Always `"agent-identity-v1"`. |
+| `validator` | string | Always `"agent-identity-protocol"`. |
 | `validatorVersion` | string | The `VALIDATOR_VERSION` constant, `"2.0.0"`. |
 | `mode` | `"file"` \| `"url"` | How the document was obtained. |
 | `source` | string | The path or URL that was validated. |

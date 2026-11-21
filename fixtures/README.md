@@ -1,4 +1,4 @@
-# Fixtures — `agent-identity-v1` `v2.0.0`
+# Fixtures — `agent-identity-protocol` `v2.0.0`
 
 This directory holds every checked-in fixture for the discovery, attestation, receipt, abuse, status,
 and provider-request surfaces, plus the expected results the manual harness compares against.
@@ -208,7 +208,7 @@ ignores additive ones.
 
 ### Contract H provider examples (`provider/`)
 
-These are validated against the normative fields in `agent-identity-v1.md` §15; Contract H has no
+These are validated against the normative fields in `agent-identity-protocol.md` §15; Contract H has no
 public JSON Schema.
 
 | Fixture | Expected |

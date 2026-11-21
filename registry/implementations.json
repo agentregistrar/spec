@@ -1,8 +1,9 @@
 {
-  "registry": "agent-identity-v1 implementation registry",
-  "description": "Machine-readable registry of Relying Parties whose published discovery document passes the identity-only agent-identity-v1 conformance validator. The human-readable view is registry/README.md; the two are kept in lockstep.",
-  "protocol": "agent-identity-v1",
-  "spec": "agent-identity-v1.md",
+  "registry": "Agent Identity Protocol implementation registry",
+  "description": "Machine-readable registry of Relying Parties whose published discovery document passes the identity-only Agent Identity Protocol conformance validator. The human-readable view is registry/README.md; the two are kept in lockstep.",
+  "protocol": "agent-identity-protocol",
+  "protocol_version": "2.0",
+  "spec": "agent-identity-protocol.md",
   "registry_criteria": "registry/README.md",
   "updated_at": "2026-10-26",
   "capability_vocabulary": [
@@ -12,7 +13,7 @@
   "capability_vocabulary_note": "Protocol capabilities only. Vendor features such as provisioning, catalogs, SKUs, pricing, OTP endpoints, and resource APIs are vendor responsibilities documented in the vendor's post-signup guide, not protocol capabilities, and must never appear here.",
   "verification_note": "OPTIONAL per-entry `verification` object (broker, level, attestation_jti, checked_at, status), validated by registry/implementations.schema.json. Conformance and verification are separate, and the object is a snapshot at checked_at. VaporCloud carries a domain-level snapshot from the live 2026-10-26 check; the registry is not a live feed and verification is not a safety or endorsement claim.",
   "validator": {
-    "id": "agent-identity-v1",
+    "id": "agent-identity-protocol",
     "version": "1.2.0",
     "script": "src/validate-discovery.ts",
     "run": "pnpm validate:discovery <url-or-file> --json",
@@ -66,7 +67,8 @@
       "discovery_url": "https://skdl.dev/.well-known/agent-signup.json",
       "discovery_url_note": "Live production discovery URL for the VaporCloud reference implementation, validated from the public internet on 2026-10-26.",
       "audience": "vaporcloud",
-      "protocol": "agent-identity-v1",
+      "protocol": "agent-identity-protocol",
+      "protocol_version": "2.0",
       "capabilities": [
         "agent_signup",
         "post_signup_context"

@@ -3,7 +3,7 @@
 - **Protocol identifier:** `agent-identity-v1` (unchanged)
 - **Specification version:** `v1.2.0`
 - **Release date:** 2026-10-24 (target; this branch is the reviewed artifact — see §6)
-- **Normative specification:** [`agent-identity-v1.md`](./agent-identity-v1.md)
+- **Normative specification:** [`agent-identity-v1.md`](./agent-identity-protocol.md)
 - **Change process:** [`release-notes-v1.0.0.md`](./release-notes-v1.0.0.md) §3
 - **Previous release:** [`release-notes-v1.1.0.md`](./release-notes-v1.1.0.md)
 
@@ -172,9 +172,9 @@ A breaking change still requires a new `protocol` value and a new discovery path
 
 ## 8. Related artifacts
 
-- Normative spec: [`agent-identity-v1.md`](./agent-identity-v1.md)
+- Normative spec: [`agent-identity-v1.md`](./agent-identity-protocol.md)
 - Scope rulebook: [`scope-boundaries.md`](./scope-boundaries.md)
-- Implementation guide: [`implementing-agent-identity-v1.md`](./implementing-agent-identity-v1.md)
+- Implementation guide: [`implementing-agent-identity-v1.md`](./implementing-agent-identity-protocol.md)
 - Validator guide: [`validator.md`](./validator.md)
 - Fixture matrix: [`fixtures/README.md`](./fixtures/README.md)
 - Registry: [`registry/README.md`](./registry/README.md),

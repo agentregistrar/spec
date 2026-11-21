@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://docs.agentregistrar.dev/agent-identity/v1/rp-attestation.schema.json",
-  "title": "Agent Identity RP attestation claims (agent-rp-attestation+jwt)",
-  "description": "Contract G claims for the Broker-B-signed RP attestation served from the v1.3.0 discovery `attestation` source (the source document is `{ \"attestation\": \"<compact JWS>\" }`; the v1.2 embedded `rp_attestation` discovery field is removed). PRODUCER MODE: every object is closed (`additionalProperties: false`); a v1.3 producer MUST NOT emit unknown fields. A verifier MUST validate every known field and ignore unknown additive fields it does not understand; the verifier gate is `parseRpAttestationVerifier` in `@agentregistrar/discovery`, not this closed schema. The JWS header is {alg: EdDSA, typ: agent-rp-attestation+jwt, kid}. Cross-field rules JSON Schema cannot express (exp-iat = 86400, rp.id = sub, legal_name at `entity`, entity_reviewed_at null at `domain`, unique keys[].kid) are normative in agent-identity-v1.md and enforced by Zod and the validator. Normative definition: agent-identity-v1.md §14.",
+  "$id": "https://docs.agentregistrar.dev/protocol/rp-attestation.schema.json",
+  "title": "Agent Identity Protocol RP attestation claims (agent-rp-attestation+jwt)",
+  "description": "Contract G claims for the Broker-B-signed RP attestation served from the discovery `attestation` source (the source document is `{ \"attestation\": \"<compact JWS>\" }`; the embedded `rp_attestation` discovery field is removed). PRODUCER MODE: every object is closed (`additionalProperties: false`); a producer MUST NOT emit unknown fields. A verifier MUST validate every known field and ignore unknown additive fields it does not understand; the verifier gate is `parseRpAttestationVerifier` in `@agentregistrar/discovery`, not this closed schema. The JWS header is {alg: EdDSA, typ: agent-rp-attestation+jwt, kid}. Cross-field rules JSON Schema cannot express (exp-iat = 86400, rp.id = sub, legal_name at `entity`, entity_reviewed_at null at `domain`, unique keys[].kid) are normative in agent-identity-protocol.md and enforced by Zod and the validator. Normative definition: agent-identity-protocol.md §14.",
   "type": "object",
   "additionalProperties": false,
   "required": ["iss", "sub", "aud", "jti", "iat", "exp", "rp", "keys"],
@@ -17,7 +17,7 @@
     },
     "aud": {
       "description": "Protocol label, never the human broker issuer.",
-      "const": "agent-identity-v1"
+      "const": "agent-identity-protocol"
     },
     "jti": {
       "description": "Attestation id: `rpa_` + 26-character lowercase Crockford base32 ULID (no i/l/o/u). Unique per issuance.",

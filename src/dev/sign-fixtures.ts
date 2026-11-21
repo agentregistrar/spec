@@ -186,7 +186,7 @@ function attestationClaims(options: {
   return {
     iss: options.iss ?? BROKER_1_ISSUER,
     sub: PROVIDER_ID,
-    aud: "agent-identity-v1",
+    aud: "agent-identity-protocol",
     jti: options.jti,
     iat,
     exp: iat + DAY,
@@ -289,7 +289,7 @@ function statusClaims(options: {
   const iat = options.iat ?? FIXTURE_IAT;
   return {
     iss: BROKER_1_ISSUER,
-    aud: "agent-identity-v1",
+    aud: "agent-identity-protocol",
     jti: options.jti,
     sub: options.sub,
     iat,

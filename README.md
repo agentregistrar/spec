@@ -1,6 +1,6 @@
-# Agent Identity v1 — Specification
+# Agent Identity Protocol — Specification
 
-The public, canonical home of the **`agent-identity-v1`** protocol: the relying-party discovery
+The public, canonical home of the **`agent-identity-protocol`** protocol: the relying-party discovery
 contract, the brokered signup handshake, the RP attestation and authenticated reporting contracts,
 the JSON Schemas, the conformance/attestation fixtures, the validators, and the implementation
 registry.
@@ -15,11 +15,12 @@ vendor catalog, provisioning, or resource surface in the protocol.
 
 | Path | Description |
 | :--- | :--- |
-| [`agent-identity-v1.md`](./agent-identity-v1.md) | Normative specification for `agent-identity-v1` (`v2.0.0`). |
+| [`agent-identity-protocol.md`](./agent-identity-protocol.md) | Normative specification for the Agent Identity Protocol (`v2.1.0`, wire protocol version `2.0`). |
 | [`scope-boundaries.md`](./scope-boundaries.md) | Identity-vs-vendor scope rulebook, including RP identity, and the future-change checklist. |
-| [`implementing-agent-identity-v1.md`](./implementing-agent-identity-v1.md) | Relying Party implementation guide (provider identity, attestation modes, receipts, abuse). |
+| [`implementing-agent-identity-protocol.md`](./implementing-agent-identity-protocol.md) | Relying Party implementation guide (provider identity, attestation modes, receipts, abuse). |
 | [`validator.md`](./validator.md) | Conformance, attestation, fixture, and registry validator guide. |
-| [`release-notes-v2.0.0.md`](./release-notes-v2.0.0.md) | Release notes for the `v2.0.0` URL-terms and keyless-attestation release (this branch). |
+| [`release-notes-v2.1.0.md`](./release-notes-v2.1.0.md) | Release notes for the `v2.1.0` Agent Identity Protocol rename and `protocol_version: "2.0"` split (this branch). |
+| [`release-notes-v2.0.0.md`](./release-notes-v2.0.0.md) | Release notes for the `v2.0.0` URL-terms and keyless-attestation release. |
 | [`release-notes-v1.3.2.md`](./release-notes-v1.3.2.md) | Release notes for the `v1.3.2` documentation patch. |
 | [`release-notes-v1.3.1.md`](./release-notes-v1.3.1.md) | Release notes for the `v1.3.1` contract-text patch. |
 | [`release-notes-v1.3.0.md`](./release-notes-v1.3.0.md) | Release notes for the `v1.3.0` release. |
@@ -83,7 +84,7 @@ verification result, never a conformance failure.
 
 ## Package
 
-`@agentregistrar/discovery` (**`2.0.0`**, **Apache-2.0**) is the self-contained package in this
+`@agentregistrar/discovery` (**`2.1.0`**, **Apache-2.0**) is the self-contained package in this
 repository. It has no private dependencies:
 
 - `src/schema.ts` — the canonical Zod schemas: `AgentSignupDiscoverySchema`, `AttestationModeSchema`,
@@ -116,7 +117,7 @@ Bump `version` in `package.json`, add `release-notes-vX.Y.Z.md`, and merge to `m
 push an annotated tag on that merge commit:
 
 ```bash
-git tag -a vX.Y.Z -m "agent-identity-v1 vX.Y.Z"
+git tag -a vX.Y.Z -m "agent-identity-protocol vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
@@ -130,8 +131,13 @@ repository ruleset, which blocks updates and deletions of matching tags.
 
 ## Specification release
 
-`agent-identity-v1` **`v2.0.0`** is the URL-hosted-terms and keyless-attestation release. It keeps the
-protocol id and the signup/assertion wire format, and simplifies two surfaces:
+Agent Identity Protocol **`v2.1.0`** renames the protocol from `agent-identity-v1` to the **Agent
+Identity Protocol** (`agent-identity-protocol`) and separates the wire version (`protocol_version:
+"2.0"` in discovery, `protocol_versions: ["2.0"]` in broker metadata, and `aud:
+"agent-identity-protocol"` in attestations). See the [v2.1.0 release
+notes](./release-notes-v2.1.0.md).
+
+`v2.0.0` introduced URL-hosted terms and keyless RP attestations:
 
 - **URL-hosted terms.** Discovery `terms` requires only `{ version, url }`. The provider hosts the
   agreement at `terms.url`; the broker fetches it at signup time and records `sha256:<hex>` over the
@@ -173,18 +179,18 @@ process are recorded in their release notes.
 This repository remains the canonical location of the specification. The rendered protocol pages are
 generated from the released specification:
 
-- Rendered specification: <https://docs.agentregistrar.dev/agent-identity/v1/specification/>
-- Scope boundaries: <https://docs.agentregistrar.dev/agent-identity/v1/scope-boundaries/>
-- Implementation guide: <https://docs.agentregistrar.dev/agent-identity/v1/implementation-guide/>
-- Validator guide: <https://docs.agentregistrar.dev/agent-identity/v1/validator/>
-- Changelog: <https://docs.agentregistrar.dev/agent-identity/v1/changelog/>
-- JSON Schema (discovery): <https://docs.agentregistrar.dev/agent-identity/v1/agent-signup.schema.json>
-- JSON Schema (attestation source): <https://docs.agentregistrar.dev/agent-identity/v1/attestation-source.schema.json>
-- JSON Schema (RP attestation): <https://docs.agentregistrar.dev/agent-identity/v1/rp-attestation.schema.json>
-- JSON Schema (broker metadata): <https://docs.agentregistrar.dev/agent-identity/v1/broker-metadata.schema.json>
-- JSON Schema (attestation status): <https://docs.agentregistrar.dev/agent-identity/v1/attestation-status.schema.json>
-- JSON Schema (signup receipt): <https://docs.agentregistrar.dev/agent-identity/v1/signup-receipt.schema.json>
-- JSON Schema (abuse report): <https://docs.agentregistrar.dev/agent-identity/v1/abuse-report.schema.json>
+- Rendered specification: <https://docs.agentregistrar.dev/protocol/specification/>
+- Scope boundaries: <https://docs.agentregistrar.dev/protocol/scope-boundaries/>
+- Implementation guide: <https://docs.agentregistrar.dev/protocol/implementation-guide/>
+- Validator guide: <https://docs.agentregistrar.dev/protocol/validator/>
+- Changelog: <https://docs.agentregistrar.dev/protocol/changelog/>
+- JSON Schema (discovery): <https://docs.agentregistrar.dev/protocol/agent-signup.schema.json>
+- JSON Schema (attestation source): <https://docs.agentregistrar.dev/protocol/attestation-source.schema.json>
+- JSON Schema (RP attestation): <https://docs.agentregistrar.dev/protocol/rp-attestation.schema.json>
+- JSON Schema (broker metadata): <https://docs.agentregistrar.dev/protocol/broker-metadata.schema.json>
+- JSON Schema (attestation status): <https://docs.agentregistrar.dev/protocol/attestation-status.schema.json>
+- JSON Schema (signup receipt): <https://docs.agentregistrar.dev/protocol/signup-receipt.schema.json>
+- JSON Schema (abuse report): <https://docs.agentregistrar.dev/protocol/abuse-report.schema.json>
 - Usage and integration guides: <https://docs.agentregistrar.dev>
 - Agent Registrar product and service: <https://agentregistrar.dev>
 

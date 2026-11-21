@@ -1,5 +1,6 @@
 {
   "protocol": "agent-identity-v2",
+  "protocol_version": "2.0",
   "audience": "vaporcloud",
   "provider_name": "VaporCloud",
   "issuer_allowlist": [
@@ -15,5 +16,5 @@
   "endpoints": {
     "agent_signup": "https://vaporcloud.example/api/signup/agent"
   },
-  "__fixture_note": "INVALID: protocol is an unknown value; only `agent-identity-v1` is supported (never best-effort)."
+  "__fixture_note": "INVALID: protocol is an unknown value; only `agent-identity-protocol` is supported (never best-effort)."
 }

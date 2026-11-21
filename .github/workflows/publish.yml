@@ -117,5 +117,5 @@ jobs:
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
-            --title "agent-identity-v1 $TAG" \
+            --title "Agent Identity Protocol $TAG" \
             --notes-file "release-notes-$TAG.md"

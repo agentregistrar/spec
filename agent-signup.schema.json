@@ -1,11 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://docs.agentregistrar.dev/agent-identity/v1/agent-signup.schema.json",
-  "title": "Agent Identity Relying Party Discovery v1 (agent-signup.json)",
-  "description": "Identity-only v1 discovery document served at GET /.well-known/agent-signup.json. It is a parameter document, not a capability catalog: vendor capability surface (instance_catalog, endpoints.provision, endpoints.email_signup, endpoints.verify_otp, endpoints.broker_signup_receipt, SKUs/pricing/resource metadata) is forbidden and rejected. The v1.2 embedded `rp_attestation` carrier is removed and rejected; v1.3 publishes one optional `attestation` source object instead. Unknown additive identity fields and namespaced `extensions` metadata are allowed and preserved. Normative definition: agent-identity-v1.md. Kept in lockstep with `AgentSignupDiscoverySchema` in this package (Zod is the source of truth).",
+  "$id": "https://docs.agentregistrar.dev/protocol/agent-signup.schema.json",
+  "title": "Agent Identity Protocol Relying Party Discovery (agent-signup.json)",
+  "description": "Identity-only discovery document served at GET /.well-known/agent-signup.json. It is a parameter document, not a capability catalog: vendor capability surface (instance_catalog, endpoints.provision, endpoints.email_signup, endpoints.verify_otp, endpoints.broker_signup_receipt, SKUs/pricing/resource metadata) is forbidden and rejected. The v1.2 embedded `rp_attestation` carrier is removed and rejected; v1.3 publishes one optional `attestation` source object instead. Unknown additive identity fields and namespaced `extensions` metadata are allowed and preserved. Normative definition: agent-identity-protocol.md. Kept in lockstep with `AgentSignupDiscoverySchema` in this package (Zod is the source of truth).",
   "type": "object",
   "required": [
     "protocol",
+    "protocol_version",
     "audience",
     "provider_name",
     "issuer_allowlist",
@@ -16,8 +17,12 @@
   "additionalProperties": true,
   "properties": {
     "protocol": {
-      "description": "Protocol version, major-only. Any other value means the service is unsupported.",
-      "const": "agent-identity-v1"
+      "description": "Canonical protocol identifier. Must be exactly `agent-identity-protocol`.",
+      "const": "agent-identity-protocol"
+    },
+    "protocol_version": {
+      "description": "Protocol version implemented by this discovery document. Any other value means the version is unsupported.",
+      "const": "2.0"
     },
     "audience": {
       "description": "Stable, case-sensitive service identifier placed verbatim in the assertion `aud`.",
@@ -50,7 +55,7 @@
       "format": "date-time"
     },
     "attestation": {
-      "description": "OPTIONAL v1.3 attestation publication source. `mode` is `broker` (the broker's stable verification route) or `provider` (a provider-hosted source document). `uri` is a stable absolute URL: HTTPS, no userinfo, no fragment; `http://localhost` / `http://127.0.0.1` is the development exception. A `broker` URI origin MUST be a trusted broker origin and appear in `issuer_allowlist`; a `provider` URI origin MUST be the discovery origin or a subdomain of it. Host binding is enforced by the validator, not by this pattern. Absence is conformant and means unverified. The source document is `{ \"attestation\": \"<compact JWS>\" }` (attestation-source.schema.json). Normative rules: agent-identity-v1.md §5.4 and §14.",
+      "description": "OPTIONAL attestation publication source. `mode` is `broker` (the broker's stable verification route) or `provider` (a provider-hosted source document). `uri` is a stable absolute URL: HTTPS, no userinfo, no fragment; `http://localhost` / `http://127.0.0.1` is the development exception. A `broker` URI origin MUST be a trusted broker origin and appear in `issuer_allowlist`; a `provider` URI origin MUST be the discovery origin or a subdomain of it. Host binding is enforced by the validator, not by this pattern. Absence is conformant and means unverified. The source document is `{ \"attestation\": \"<compact JWS>\" }` (attestation-source.schema.json). Normative rules: agent-identity-protocol.md §5.4 and §14.",
       "type": "object",
       "required": ["mode", "uri"],
       "additionalProperties": false,

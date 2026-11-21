@@ -1,8 +1,9 @@
 /**
- * Frozen numeric bounds, patterns, and clock constants for `agent-identity-v1`
- * `v1.3.0` (Contracts G, I, E, D.2; unchanged from `v1.2.0`). These mirror the normative text in
- * `agent-identity-v1.md` §5 and are shared by the Zod schemas, the attestation
- * verifier, and the fixture harness so no two copies can drift.
+ * Frozen numeric bounds, patterns, and clock constants for the Agent Identity
+ * Protocol (`agent-identity-protocol`, version `2.0`; Contracts G, I, E, D.2).
+ * These mirror the normative text in `agent-identity-protocol.md` §5 and are
+ * shared by the Zod schemas, the attestation verifier, and the fixture harness
+ * so no two copies can drift.
  */
 
 /** A compact attestation JWS is capped at 16 KiB in the source document (spec §5.3/§14). */
@@ -52,8 +53,11 @@ export const KEY_POP_TYP = "agent-rp-key-pop+jwt";
 export const ABUSE_TYP = "agent-rp-abuse+jwt";
 export const RECEIPT_TYP = "agent-signup-receipt+jwt";
 
-/** The assertion/attestation audience label; never the human broker issuer. */
-export const PROTOCOL_AUDIENCE = "agent-identity-v1";
+/** The canonical wire protocol identifier in discovery documents. */
+export const PROTOCOL_NAME = "agent-identity-protocol";
 
-/** Broker metadata `protocol_versions` must contain this value (spec §5.4). */
-export const PROTOCOL_VERSION = "agent-identity-v1";
+/** The assertion/attestation audience label; never the human broker issuer. */
+export const PROTOCOL_AUDIENCE = "agent-identity-protocol";
+
+/** Current wire protocol version (carried in discovery `protocol_version` and broker metadata `protocol_versions`). */
+export const PROTOCOL_VERSION = "2.0";

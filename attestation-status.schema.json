@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://docs.agentregistrar.dev/agent-identity/v1/attestation-status.schema.json",
-  "title": "Agent Identity attestation status claims (agent-rp-attestation-status+jwt)",
-  "description": "Contract I status JWS claims returned by the broker's `attestation_status_uri` (agent-identity-v1.md §16). Header: {alg: EdDSA, typ: agent-rp-attestation-status+jwt, kid}. `sub` is the queried attestation `jti`; `exp - iat` MUST equal exactly 300 seconds; `status_changed_at` MUST NOT be after `iat` (cross-field rules enforced by Zod and the validator). The endpoint's plaintext `attestation_jti` field is advisory: clients MUST verify this JWS and use `sub`. Caching is bounded to 300 seconds.",
+  "$id": "https://docs.agentregistrar.dev/protocol/attestation-status.schema.json",
+  "title": "Agent Identity Protocol attestation status claims (agent-rp-attestation-status+jwt)",
+  "description": "Contract I status JWS claims returned by the broker's `attestation_status_uri` (agent-identity-protocol.md §16). Header: {alg: EdDSA, typ: agent-rp-attestation-status+jwt, kid}. `sub` is the queried attestation `jti`; `exp - iat` MUST equal exactly 300 seconds; `status_changed_at` MUST NOT be after `iat` (cross-field rules enforced by Zod and the validator). The endpoint's plaintext `attestation_jti` field is advisory: clients MUST verify this JWS and use `sub`. Caching is bounded to 300 seconds.",
   "type": "object",
   "additionalProperties": false,
   "required": ["iss", "aud", "jti", "sub", "iat", "exp", "status", "status_changed_at"],
@@ -12,7 +12,7 @@
       "$ref": "#/$defs/origin"
     },
     "aud": {
-      "const": "agent-identity-v1"
+      "const": "agent-identity-protocol"
     },
     "jti": {
       "description": "Unique status-response id (UUIDv4). Not the attestation id.",

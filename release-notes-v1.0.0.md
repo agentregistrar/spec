@@ -3,7 +3,7 @@
 - **Protocol identifier:** `agent-identity-v1`
 - **Specification version:** `v1.0.0`
 - **Release date:** 2026-10-17
-- **Normative specification:** [`agent-identity-v1.md`](./agent-identity-v1.md)
+- **Normative specification:** [`agent-identity-v1.md`](./agent-identity-protocol.md)
 
 This is the initial identity-only release of the Agent Identity Relying Party discovery contract
 (`GET /.well-known/agent-signup.json`). It is released as `v1.0.0` after the identity-only schema, the
@@ -18,7 +18,7 @@ The release is recorded once the following artifacts agree on the same identity-
 
 | Artifact | Location | Role |
 | :--- | :--- | :--- |
-| Normative specification | [`agent-identity-v1.md`](./agent-identity-v1.md) | The single source of truth for the contract. |
+| Normative specification | [`agent-identity-v1.md`](./agent-identity-protocol.md) | The single source of truth for the contract. |
 | Scope rulebook | [`scope-boundaries.md`](./scope-boundaries.md) | Identity-vs-vendor boundary and the change-review checklist. |
 | Implementation source of truth | `src/schema.ts` (`AgentSignupDiscoverySchema`) | Runtime validation shared by the broker, validator, and reference implementation. |
 | JSON Schema | [`agent-signup.schema.json`](./agent-signup.schema.json) | Checked-in schema; the validator reports any divergence from Zod. |
@@ -43,7 +43,7 @@ The release is recorded once the following artifacts agree on the same identity-
 
 ## 2. Canonical public spec URL decision
 
-- This repository ([`agent-identity-v1.md`](./agent-identity-v1.md)) is the **canonical location** of
+- This repository ([`agent-identity-v1.md`](./agent-identity-protocol.md)) is the **canonical location** of
   the specification. It is versioned in the repository and updated only through the change process in
   §3.
 - The **final canonical hosting URL** for a rendered copy is undecided (spec §16). Until it exists,
@@ -112,5 +112,5 @@ a hosted implementation is an operational step performed by that implementer.
 
 - Adoption surface: [`registry/README.md`](./registry/README.md) and
   [`registry/implementations.json`](./registry/implementations.json).
-- New-RP guide: [`implementing-agent-identity-v1.md`](./implementing-agent-identity-v1.md).
+- New-RP guide: [`implementing-agent-identity-v1.md`](./implementing-agent-identity-protocol.md).
 - Validator guide: [`validator.md`](./validator.md).

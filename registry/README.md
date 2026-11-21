@@ -1,11 +1,11 @@
-# `agent-identity-v1` Implementation Registry
+# `agent-identity-protocol` Implementation Registry
 
 - **Status:** Published.
 - **Machine-readable registry (canonical source):** [`implementations.json`](./implementations.json)
-- **Specification:** [`../agent-identity-v1.md`](../agent-identity-v1.md) — **v1.2.0**, released 2026-10-24 and tagged `v1.2.0` ([release notes](../release-notes-v1.2.0.md)). Earlier releases are `v1.1.0` (2026-10-18) and `v1.0.0` (2026-10-17).
+- **Specification:** [`../agent-identity-protocol.md`](../agent-identity-protocol.md) — **v1.2.0**, released 2026-10-24 and tagged `v1.2.0` ([release notes](../release-notes-v1.2.0.md)). Earlier releases are `v1.1.0` (2026-10-18) and `v1.0.0` (2026-10-17).
 - **Conformance and attestation validator:** `src/validate-discovery.ts` — run as `pnpm validate:discovery <url-or-file> --json` ([validator guide](../validator.md)).
 - **Registry validator and schema:** `src/validate-registry.ts` (`pnpm validate:registry [path] [--json]`) and [`implementations.schema.json`](./implementations.schema.json).
-- **Implementation guide:** [`../implementing-agent-identity-v1.md`](../implementing-agent-identity-v1.md).
+- **Implementation guide:** [`../implementing-agent-identity-protocol.md`](../implementing-agent-identity-protocol.md).
 
 This registry is **adoption infrastructure**, not an enforcement mechanism. The validator is the
 objective check and the registry is a public list of the implementations that pass it.
@@ -14,7 +14,7 @@ objective check and the registry is a public list of the implementations that pa
 
 ## 1. What conformance means
 
-An implementation is **`agent-identity-v1` conformant** when the discovery document it serves at
+An implementation is **`agent-identity-protocol` conformant** when the discovery document it serves at
 `GET /.well-known/agent-signup.json` passes the identity-only conformance validator with **zero
 errors**. Conformance means:
 
@@ -97,7 +97,7 @@ capabilities only; vendor features are never listed.
 
 | Implementation | Discovery URL | Audience | Protocol | Capabilities | Contact | Validated | Verification |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **VaporCloud** (reference) | `https://skdl.dev/.well-known/agent-signup.json` | `vaporcloud` | `agent-identity-v1` | `agent_signup`, `post_signup_context` | `security@skdl.dev` | 2026-10-26 | verified (domain) |
+| **VaporCloud** (reference) | `https://skdl.dev/.well-known/agent-signup.json` | `vaporcloud` | `agent-identity-protocol` | `agent_signup`, `post_signup_context` | `security@skdl.dev` | 2026-10-26 | verified (domain) |
 
 Registry metadata (validator version, exact commands, and observed protocol/audience) lives in the
 machine-readable file. Each entry's `validator_evidence` records the concrete command and result.
@@ -122,14 +122,14 @@ guide at `https://skdl.dev/docs/SKILL.md`, reached through the signed `context` 
 ## 4. How to submit an entry
 
 1. Make your discovery document conformant using the
-   [implementation guide](../implementing-agent-identity-v1.md).
+   [implementation guide](../implementing-agent-identity-protocol.md).
 2. Run the validator against your **public** discovery URL and keep the JSON:
    ```bash
    pnpm --silent validate:discovery https://your-service.example/.well-known/agent-signup.json --json
    ```
 3. Open a pull request that adds one object to the `implementations` array in
    [`implementations.json`](./implementations.json) with:
-   `name`, `url`, `discovery_url`, `audience`, `protocol` (`agent-identity-v1`),
+   `name`, `url`, `discovery_url`, `audience`, `protocol` (`agent-identity-protocol`),
    `capabilities` (protocol capabilities only), `contact`, `validated_at`, `validator_version`, and a
    `validator_evidence` object containing the exact command and the resulting counts
    (`protocol` and `audience` read directly from the `--json` output — see the
@@ -141,7 +141,7 @@ guide at `https://skdl.dev/docs/SKILL.md`, reached through the signed `context` 
 5. Update the table in §3 of this README so the two stay in lockstep.
 6. The pull request is reviewed against the entry criteria in §2.
 
-To update or remove an entry (for example after dropping `agent-identity-v1` support), submit a pull
+To update or remove an entry (for example after dropping `agent-identity-protocol` support), submit a pull
 request with the validator evidence for the change. An entry whose document no longer passes the
 validator is removed.
 
@@ -159,19 +159,19 @@ into the static entry; record a new check to update it.
 ## 6. Conformance badge
 
 Implementations listed in the registry may display the following badge. It states that the
-implementation's **discovery document** is `agent-identity-v1` conformant; it links to the
+implementation's **discovery document** is `agent-identity-protocol` conformant; it links to the
 specification and to the registry entry criteria in §2.
 
 ```html
-<!-- agent-identity-v1 conformance badge -->
-<a href="https://<canonical-spec-host>/agent-identity/v1/agent-signup"><strong>agent-identity-v1</strong></a>
+<!-- agent-identity-protocol conformance badge -->
+<a href="https://<canonical-spec-host>/protocol/agent-signup"><strong>agent-identity-protocol</strong></a>
 <a href="https://<registry-host>/registry/README.md#2-entry-criteria"><strong>conformant</strong></a>
 ```
 
 Markdown equivalent:
 
 ```markdown
-[**agent-identity-v1**](https://<canonical-spec-host>/agent-identity/v1/agent-signup) [**conformant**](https://<registry-host>/registry/README.md#2-entry-criteria)
+[**agent-identity-protocol**](https://<canonical-spec-host>/protocol/agent-signup) [**conformant**](https://<registry-host>/registry/README.md#2-entry-criteria)
 ```
 
 > **Replace the placeholder hosts before publishing.** `https://<canonical-spec-host>/…` and
@@ -179,12 +179,12 @@ Markdown equivalent:
 > live these links resolve nowhere, so a badge copied verbatim ships dead links. Substitute the
 > real hosts (or the in-repo paths below) before you publish.
 
-Both render as **agent-identity-v1 conformant**. The specification is not yet hosted at a final
+Both render as **agent-identity-protocol conformant**. The specification is not yet hosted at a final
 canonical URL, so this repository is the **canonical location** (see the
-[spec §1.3](../agent-identity-v1.md) and
+[spec §1.3](../agent-identity-protocol.md) and
 [release notes](../release-notes-v1.1.0.md)); substitute the canonical URL for
 the `<…>` placeholders once hosting exists. In-repo, the link targets are
-[`agent-identity-v1.md`](../agent-identity-v1.md) and §2 of this document.
+[`agent-identity-protocol.md`](../agent-identity-protocol.md) and §2 of this document.
 
 ### Badge usage terms
 
@@ -203,11 +203,11 @@ the `<…>` placeholders once hosting exists. In-repo, the link targets are
 
 | Artifact | Location |
 | :--- | :--- |
-| Specification (`v1.3.2`) | [`../agent-identity-v1.md`](../agent-identity-v1.md) |
+| Specification (`v1.3.2`) | [`../agent-identity-protocol.md`](../agent-identity-protocol.md) |
 | Scope boundaries rulebook | [`../scope-boundaries.md`](../scope-boundaries.md) |
 | Conformance + attestation validator guide | [`../validator.md`](../validator.md) |
 | Registry schema | [`./implementations.schema.json`](./implementations.schema.json) |
-| Implementation guide (new RPs) | [`../implementing-agent-identity-v1.md`](../implementing-agent-identity-v1.md) |
+| Implementation guide (new RPs) | [`../implementing-agent-identity-protocol.md`](../implementing-agent-identity-protocol.md) |
 | Release notes (`v1.2.0`) | [`../release-notes-v1.2.0.md`](../release-notes-v1.2.0.md) |
 | Release notes (`v1.1.0`) | [`../release-notes-v1.1.0.md`](../release-notes-v1.1.0.md) |
 | Release notes (`v1.0.0`) | [`../release-notes-v1.0.0.md`](../release-notes-v1.0.0.md) |
