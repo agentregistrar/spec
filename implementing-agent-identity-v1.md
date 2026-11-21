@@ -42,7 +42,7 @@ Serve `GET /.well-known/agent-signup.json` on your canonical HTTPS origin:
 
 Required fields (`agent-identity-v1.md` §5.1): `protocol` (`"agent-identity-v1"`), `audience`,
 `provider_name`, non-empty `issuer_allowlist`, unique `required_scopes` (including `tos:accept`),
-`terms` (complete `text` + `version` + `url` + `sha256`), and `endpoints.agent_signup`.
+`terms` (`version` + the URL of your own hosted terms document), and `endpoints.agent_signup`.
 
 Optional fields (§5.2): `spec`, `provider_url`, `contact`, `updated_at`, non-capability `extensions`
 keyed by reverse-DNS namespace, and the optional `attestation` source object (§10 of this guide).
@@ -59,21 +59,27 @@ metadata. Moving a capability under `extensions` does **not** make it conformant
 
 ---
 
-## 2. Compute and maintain the ToS hash
+## 2. Host your terms and keep them current
 
-- `terms.sha256` is `sha256:<64 lowercase hex>` over the **exact UTF-8 bytes of `terms.text`** — no
-  trimming, no newline normalization, no HTML extraction.
-- `terms.text` is the **complete** agreement the agent is accepting, not a summary.
-- `terms.url` is an absolute HTTPS page where a human can read the same text.
-- Bump `terms.version` whenever the text changes materially, and update `text`, `sha256`, and `url`
-  **atomically**.
-- The agent recomputes the hash from `terms.text` before calling its Broker; your signup endpoint
-  must reject an assertion whose `delegation.accepted_rp_tos_hash` is not the currently advertised
-  `terms.sha256` (`tos_hash_mismatch`).
+- `terms.url` is an absolute HTTPS page (localhost development exception) that serves your terms
+  document. **You host it**; do not paste prose into discovery.
+- Discovery requires only `terms.version` and `terms.url`. `terms.text` and `terms.sha256` are
+  removed in `v2.0.0` and are ignored if an older document still carries them.
+- At signup the broker fetches `terms.url` and computes `sha256:<64 lowercase hex>` over the **exact
+  response bytes** — no trimming, no newline normalization, no HTML extraction. It records that hash
+  in the assertion `delegation.accepted_rp_tos_hash` and in the acceptance ledger, and records
+  `delegation.accepted_rp_tos_url` from the advertised URL.
+- Your signup endpoint checks `delegation.accepted_rp_tos_url` against your current `terms.url`, and
+  **may** additionally check `delegation.accepted_rp_tos_hash` when you serve deterministic bytes.
+  Reject a stale value with `tos_hash_mismatch`.
+- Bump `terms.version` whenever the document changes materially, and publish the new bytes before
+  accepting new signups.
 
-You may keep a short, explicitly documented grace period for in-flight assertions after a change,
-but the discovery document advertises **only** the current version, and the grace period must be
-documented **outside** discovery (e.g. in your guide or a support page).
+Serve deterministic bytes if you want the optional hash check to be useful (static HTML or plain
+text rather than a rendered page with per-request content). You may keep a short, explicitly
+documented grace period for in-flight assertions after a change, but the discovery document
+advertises **only** the current version, and the grace period must be documented **outside**
+discovery (e.g. in your guide or a support page).
 
 ---
 
@@ -91,7 +97,8 @@ assertion is Contract A (Ed25519 JWT); you only verify it here. Enforce at minim
 5. `jti` has not already been used for an account creation.
 6. `delegation.scopes` includes every `required_scopes` entry.
 7. `human.verified === true`.
-8. `delegation.accepted_rp_tos_hash === terms.sha256`.
+8. `delegation.accepted_rp_tos_url` equals your current `terms.url` (and optionally
+   `delegation.accepted_rp_tos_hash` matches the deterministic bytes you serve).
 
 Record the assertion `jti`, the accepted ToS version/hash, and attribution for audit. Revocation is
 enforced by the Broker at minting time; you do not need a revocation feed for v1.
@@ -208,8 +215,9 @@ Exit codes: `0` valid / no required check failed, `1` conformance or required-ve
 (including a body that is not valid JSON), `2` could not obtain what the run needed (the document, a
 JWKS, or the attestation source) — an operational result with no conformance verdict
 (`DOCUMENT: NOT CHECKED`). The validator rejects vendor capability fields at any depth (including
-under `extensions`) and recomputes the ToS hash. A validator-passing document is the objective entry
-criterion for the implementation registry.
+under `extensions`) and checks only that `terms.version` and `terms.url` are well formed. It does not
+fetch `terms.url` or compute a ToS hash; the broker does that at signup. A validator-passing document
+is the objective entry criterion for the implementation registry.
 
 Conformance and attestation verification are separate. Once you publish an `attestation` source by
 either mode, verify it offline in CI against a pinned broker JWKS:
@@ -227,9 +235,9 @@ the conformance verdict still passes; with it, anything but `verified` fails (an
 `2`). A typed broker `403`/`404`/`410` is a verification result, not a conformance failure: a
 suspended, unknown, or revoked state does not make your discovery document non-conformant.
 
-The validator is the source-first package `@agentregistrar/discovery` (`1.3.2`, **Apache-2.0**). Run it
+The validator is the source-first package `@agentregistrar/discovery` (`2.0.0`, **Apache-2.0**). Run it
 from a clone of this specification repository, or use the pinned git dependency
-(`github:agentregistrar/spec#v1.3.2`) once the tag exists. There is no `bin` entry — always invoke it
+(`github:agentregistrar/spec#v2.0.0`) once the tag exists. There is no `bin` entry — always invoke it
 with `pnpm validate:discovery`.
 
 To test both modes without a live broker, use the checked-in fixtures and the fixture-only
@@ -266,9 +274,11 @@ under `--verify-attestation`.
 
 ## 8. Adoption / registry conventions
 
-The current specification release is **`v1.3.2`** (2026-11-14), a documentation-correction patch on
-**`v1.3.1`** (contract-text corrections), itself a patch on **`v1.3.0`**, the breaking
-discovery-carrier release — see [`release-notes-v1.3.2.md`](./release-notes-v1.3.2.md),
+The current specification release is **`v2.0.0`** (2026-11-21), the URL-hosted-terms and keyless-RP
+attestation release — see [`release-notes-v2.0.0.md`](./release-notes-v2.0.0.md). It follows
+**`v1.3.2`** (documentation-correction patch), **`v1.3.1`** (contract-text corrections), and
+**`v1.3.0`** (the breaking discovery-carrier release) — see
+[`release-notes-v1.3.2.md`](./release-notes-v1.3.2.md),
 [`release-notes-v1.3.1.md`](./release-notes-v1.3.1.md), and
 [`release-notes-v1.3.0.md`](./release-notes-v1.3.0.md). Earlier releases: **`v1.2.0`** (2026-10-24,
 [`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md)), **`v1.1.0`**
@@ -292,10 +302,11 @@ published in
 
 ---
 
-## 9. Register as a provider, prove the origin, and register a key
+## 9. Register as a provider, prove the origin, and optionally register a key
 
-Relying Party identity (Contract G) is optional for conformance but required for a verified profile,
-authenticated receipts, and abuse standing. The full wire contract is `agent-identity-v1.md` §15.
+Relying Party identity (Contract G) is optional for conformance but required for a verified profile.
+RP signing keys are a further optional step, needed only for signed receipts and authenticated abuse
+reports. The full wire contract is `agent-identity-v1.md` §15.
 
 1. **Create a provider account with your RP broker.** The account is an organization, separate from
    any individual human login. It starts `pending`; it becomes `active` when its first origin is
@@ -307,13 +318,16 @@ authenticated receipts, and abuse standing. The full wire contract is `agent-ide
    single-use with a 30-minute TTL: serve `file_content` exactly at `file_url` (one optional trailing
    LF), or publish `record_value` at `record_name`. The broker fetches with HTTPS-only, public-IP,
    no-cross-origin-redirect, 5-second, 64 KiB rules.
-4. **Generate an Ed25519 keypair locally and keep the private key.** Register the public key with a
-   proof of possession: request a `kid`-bound challenge, then sign the PoP JWS with
-   `typ: agent-rp-key-pop+jwt`, `aud` = the broker issuer, `sub` = your provider UUID, the challenge
-   as `nonce`, and your public JWK. The broker never sees your private key.
-5. **Keep a rotation path.** Add the new key, let both appear in attestations for the 30-day overlap,
-   then retire the old one. Revocation is immediate; old receipts still verify from the attestation
-   they name.
+4. **Optional: generate an Ed25519 keypair and register it.** RP signing keys are needed only for
+   signed receipts (Contract E) and authenticated abuse reports (Contract D.2). A domain-verified
+   provider can go live without a key: its broker-managed attestation carries `keys: []` and supports
+   agent signup. To register a key, keep the private key locally and prove possession: request a
+   `kid`-bound challenge, then sign the PoP JWS with `typ: agent-rp-key-pop+jwt`, `aud` = the broker
+   issuer, `sub` = your provider UUID, the challenge as `nonce`, and your public JWK. The broker never
+   sees your private key.
+5. **Keep a rotation path if you register keys.** Add the new key, let both appear in attestations for
+   the 30-day overlap, then retire the old one. Revocation is immediate; old receipts still verify from
+   the attestation they name.
 
 Provider API keys are separate from your RP signing key: they authenticate CI to Contract H, are
 scoped, hashed at rest, and never sign receipts or abuse reports.
@@ -387,6 +401,10 @@ You host the source document and renew the token yourself through Contract H.
 
 ### 10.3 Rules common to both modes
 
+- `keys` may be empty (`0–8` entries). A domain-verified provider that has not registered an RP key
+  still receives a valid keyless attestation; it verifies against the broker JWKS like any other
+  attestation. Register a key only when you need signed receipts or abuse reports.
+
 - Do not put terms, scopes, endpoints, prices, or `provider_url` in the attestation. It is identity.
 - An expired attestation is `expired`, not `unverified`, and a `verify` or `strict` policy will refuse
   it. An absent `attestation` object is conformant and `unverified`.
@@ -426,7 +444,9 @@ pnpm --silent validate:discovery path/to/agent-signup.json \
 
 ## 11. Sign receipts with your RP key (Contract E v1.2)
 
-See §5. The three rules implementers most often get wrong:
+Receipts are opt-in and require a registered RP signing key. A keyless attestation (`keys: []`) is
+valid for signup but cannot sign a receipt or an abuse report, so skip this section until you
+register a key. See §5. The three rules implementers most often get wrong:
 
 1. **`exp` is gone.** Do not gate account access on the receipt. A receipt proves a past signup.
 2. **The key comes from the attestation.** `service.key_id` must be in the `keys[]` of the
@@ -513,13 +533,15 @@ broker-managed mode. `blocked` is a separate human action, not a mode, and rejec
 ## 15. Common mistakes
 
 - Copying the vendor-shaped Contract D.1 sample from older docs (catalog + provisioning endpoints).
-- Hashing the rendered HTML page instead of the exact `terms.text` bytes.
-- Trusting the agent's advertised `terms.sha256` without recomputing it from `terms.text`.
+- Hashing the rendered HTML page instead of hashing the exact bytes the broker fetches from
+  `terms.url`.
+- Publishing a `terms.sha256` or `terms.text` you computed by hand; both are removed from discovery
+  in `v2.0.0` and the broker computes the hash itself.
 - Advertising `endpoints.verify_otp` / legacy OTP flows as protocol surface (they are your own
   feature; the Broker inbox is the in-scope reachability path).
 - Returning vendor resource fields in the signed receipt instead of a `context` pointer.
 - Putting a `context` pointer on a different domain from the signup endpoint.
-- Treating `terms.text` or your guide as instructions the Broker will execute (they are data).
+- Treating your terms or guide as instructions the Broker will execute (they are data).
 - Publishing an attestation whose `rp.origin` is `provider_url` or a redirect target rather than the
   origin that serves discovery.
 - Still embedding the attestation JWS in discovery as `rp_attestation` (removed in `v1.3.0`; the

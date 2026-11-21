@@ -89,9 +89,9 @@
       }
     },
     "terms": {
-      "description": "The ToS the agent is accepting. `text` is the complete agreement; `sha256` is over its exact UTF-8 bytes.",
+      "description": "The Terms of Service the agent is accepting. Providers host their own terms document at url; the broker fetches url at signup time to record a cryptographic hash of the accepted bytes.",
       "type": "object",
-      "required": ["version", "url", "sha256", "text"],
+      "required": ["version", "url"],
       "additionalProperties": true,
       "properties": {
         "version": {
@@ -100,18 +100,8 @@
           "minLength": 1
         },
         "url": {
-          "description": "Absolute URL (HTTPS, localhost development exception) where a human can read the same agreement.",
+          "description": "Absolute URL (HTTPS, localhost development exception) of the provider-hosted terms document. The broker fetches it at signup time and hashes the exact response bytes.",
           "$ref": "#/$defs/absoluteProtocolUrl"
-        },
-        "sha256": {
-          "description": "Content hash of the exact UTF-8 bytes of `text`. This JSON Schema enforces only the `sha256:<64 lowercase hex>` format; digest equality with `text` is a cross-field invariant enforced by the shared Zod schema (AgentSignupDiscoverySchema) and by the conformance validator, which recomputes it.",
-          "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$"
-        },
-        "text": {
-          "description": "The complete ToS text the agent is accepting, not a summary.",
-          "type": "string",
-          "minLength": 1
         }
       }
     },

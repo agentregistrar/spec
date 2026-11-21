@@ -314,6 +314,10 @@ async function runAttestationCase(
   }
   const jwt = await readText(fixture.jwt);
   const claims = claimsOf(jwt);
+  const keysCount = (() => {
+    const keys = readRecord(claims)?.keys;
+    return Array.isArray(keys) ? keys.length : null;
+  })();
 
   const producerExpected = fixture.expect.producer === true;
   const verifierExpected = fixture.expect.verifier === true;
@@ -357,6 +361,7 @@ async function runAttestationCase(
   );
   compare(fixture.expect.status, result.status, "status", problems);
   compare(fixture.expect.reason, result.reason, "reason", problems);
+  compare(fixture.expect.keysCount, keysCount, "claims.keys.length", problems);
 
   return {
     id: fixture.id,

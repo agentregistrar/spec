@@ -15,11 +15,12 @@ vendor catalog, provisioning, or resource surface in the protocol.
 
 | Path | Description |
 | :--- | :--- |
-| [`agent-identity-v1.md`](./agent-identity-v1.md) | Normative specification for `agent-identity-v1` (`v1.3.2`). |
+| [`agent-identity-v1.md`](./agent-identity-v1.md) | Normative specification for `agent-identity-v1` (`v2.0.0`). |
 | [`scope-boundaries.md`](./scope-boundaries.md) | Identity-vs-vendor scope rulebook, including RP identity, and the future-change checklist. |
 | [`implementing-agent-identity-v1.md`](./implementing-agent-identity-v1.md) | Relying Party implementation guide (provider identity, attestation modes, receipts, abuse). |
 | [`validator.md`](./validator.md) | Conformance, attestation, fixture, and registry validator guide. |
-| [`release-notes-v1.3.2.md`](./release-notes-v1.3.2.md) | Release notes for the `v1.3.2` documentation patch (this branch). |
+| [`release-notes-v2.0.0.md`](./release-notes-v2.0.0.md) | Release notes for the `v2.0.0` URL-terms and keyless-attestation release (this branch). |
+| [`release-notes-v1.3.2.md`](./release-notes-v1.3.2.md) | Release notes for the `v1.3.2` documentation patch. |
 | [`release-notes-v1.3.1.md`](./release-notes-v1.3.1.md) | Release notes for the `v1.3.1` contract-text patch. |
 | [`release-notes-v1.3.0.md`](./release-notes-v1.3.0.md) | Release notes for the `v1.3.0` release. |
 | [`release-notes-v1.2.0.md`](./release-notes-v1.2.0.md) | Release notes for `v1.2.0`. |
@@ -82,7 +83,7 @@ verification result, never a conformance failure.
 
 ## Package
 
-`@agentregistrar/discovery` (**`1.3.2`**, **Apache-2.0**) is the self-contained package in this
+`@agentregistrar/discovery` (**`2.0.0`**, **Apache-2.0**) is the self-contained package in this
 repository. It has no private dependencies:
 
 - `src/schema.ts` — the canonical Zod schemas: `AgentSignupDiscoverySchema`, `AttestationModeSchema`,
@@ -105,34 +106,37 @@ The seven protocol schemas and the registry schema are listed in `files` and exp
 subpaths (for example `@agentregistrar/discovery/agent-signup.schema.json`). The package is
 **source-first**: the npm tarball ships the TypeScript sources (no build step). Consumers therefore
 need a toolchain that transpiles dependencies (for example Next.js `transpilePackages` or `tsx`).
-Install it from npm, or use the pinned git dependency (`github:agentregistrar/spec#v1.3.2`) once the
+Install it from npm, or use the pinned git dependency (`github:agentregistrar/spec#v2.0.0`) once the
 tag exists. The package declares no `bin` entry — run the CLI with `pnpm validate:discovery`.
 
 ### Releasing the package
 
 Publishing uses **npm trusted publishing (OIDC)** — no long-lived npm token. Bump `version` in
-`package.json`, merge to `main`, tag the merge commit `v1.3.2`, then run the `Publish package`
+`package.json`, merge to `main`, tag the merge commit `v2.0.0`, then run the `Publish package`
 workflow (`.github/workflows/publish.yml`, environment `npm-publish`) from `main`. Provenance is
 generated automatically. Never run a local `npm publish` and never use an npm token.
 
 ## Specification release
 
-`agent-identity-v1` **`v1.3.2`** is a **documentation-correction** patch on `v1.3.1`. It changes no
-wire format, JSON Schema, fixture, validator behavior, or attestation claim; it fixes two normative
-contradictions in the `v1.3.1` text:
+`agent-identity-v1` **`v2.0.0`** is the URL-hosted-terms and keyless-attestation release. It keeps the
+protocol id and the signup/assertion wire format, and simplifies two surfaces:
 
-- Issuance with no active key is `409 no_active_key`, not `403 provider_not_eligible`; that `403` is
-  scoped to a non-active provider or a non-verified origin (§15.3, §15.5).
-- The "binding unchecked" rule applies to a `provider` source without a fetch origin; a `broker`
-  source is always checked from `issuer_allowlist` (§14.2).
+- **URL-hosted terms.** Discovery `terms` requires only `{ version, url }`. The provider hosts the
+  agreement at `terms.url`; the broker fetches it at signup time and records `sha256:<hex>` over the
+  exact response bytes in the assertion and the ToS ledger. `terms.text` and `terms.sha256` are no
+  longer required or validated and are ignored if present. RPs check `accepted_rp_tos_url` and may
+  optionally check `accepted_rp_tos_hash`.
+- **Keyless RP attestations.** Contract G `keys` allows 0–8 entries. A domain-verified provider with no
+  registered RP signing key receives a valid attestation with `keys: []`; receipts and abuse reports
+  still require a key.
 
-`v1.3.1` remains the contract-text correction that replaced the old policy vocabulary: attestation
-issuance is not plan-, billing-, or subscription-gated (§15.3, §15.4), and the client policy contract
-is exactly `no_verify`/`verify`/`strict` with a `verify` default and a separate `blocked` human action;
-there is no `enforced` field and no `allow`/`warn`/`require`/`block` vocabulary (§17.2, §17.3, §18.3).
+See the [v2.0.0 release notes](./release-notes-v2.0.0.md) for the migration steps.
 
-See the [v1.3.2 release notes](./release-notes-v1.3.2.md) for why the correction shipped as a patch
-rather than a rewrite of an earlier version.
+`v1.3.2` was a **documentation-correction** patch on `v1.3.1`. It changed no wire format, schema,
+fixture, validator behavior, or attestation claim; it fixed two normative contradictions in the
+`v1.3.1` text: issuance with no active key is `409 no_active_key` (scoped to key operations), not
+`403 provider_not_eligible`; and the "binding unchecked" rule applies to a `provider` source without a
+fetch origin, while a `broker` source is always checked from `issuer_allowlist`.
 
 **`v1.3.0` breaking discovery change.** `v1.3.0` removes the embedded `rp_attestation` discovery field
 and replaces it with one OPTIONAL `attestation` object:

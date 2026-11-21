@@ -612,11 +612,15 @@ export async function verifyRpAttestation(
   result.audience = claims.rp.audience;
   result.level = claims.rp.verification.level;
   result.expires_at = claims.exp;
+  // `keys` may be empty (0-8 entries): a domain-verified provider that has not
+  // registered RP signing keys still receives a valid attestation. The signature
+  // being verified here is always the broker's, selected by the JWS header `kid`,
+  // never a key from `claims.keys`.
   push(
     result,
     "claims",
     "pass",
-    `claims are structurally valid (iss ${claims.iss}, jti ${claims.jti}, level ${claims.rp.verification.level})`,
+    `claims are structurally valid (iss ${claims.iss}, jti ${claims.jti}, level ${claims.rp.verification.level}, ${claims.keys.length} RP key(s))`,
   );
 
   // Step 2: trust before any JWKS/status fetch.

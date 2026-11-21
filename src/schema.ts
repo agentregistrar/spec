@@ -22,8 +22,6 @@
  * - Only the explicitly removed vendor fields are rejected; a blanket `.strict()`
  *   would make additive evolution impossible.
  */
-import { createHash } from "node:crypto";
-
 import { z } from "zod";
 
 import {
@@ -43,16 +41,6 @@ import {
   UUID_PATTERN,
 } from "./constants";
 import { isHttpsCanonicalOrigin } from "./http";
-
-/**
- * Computes the canonical `sha256:<64 lowercase hex>` content hash used to
- * reference immutable content (the relying party terms text, the Master ToS,
- * etc.) over the exact UTF-8 bytes of `content`.
- */
-function computeSha256Prefixed(content: string): string {
-  const digest = createHash("sha256").update(content, "utf8").digest("hex");
-  return `sha256:${digest}`;
-}
 
 /** Hostnames that may use plain `http://` as the documented development exception. */
 const DEV_LOCALHOST_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);
@@ -142,14 +130,6 @@ const issuerOrigin = z
       "must be an absolute issuer origin with no path, query, fragment, or wildcard",
   });
 
-/** `sha256:<64 lowercase hex characters>` (spec §6). */
-const sha256Hash = z
-  .string()
-  .regex(
-    /^sha256:[0-9a-f]{64}$/,
-    "must use the form `sha256:<64 lowercase hex characters>`",
-  );
-
 /** Non-empty, whitespace-free service identifier (spec §5.1). */
 const audience = z
   .string()
@@ -229,8 +209,9 @@ const iso8601Timestamp = z
  * Identity-only v1 discovery document served at `/.well-known/agent-signup.json`.
  *
  * Required: `protocol`, `audience`, `provider_name`, `issuer_allowlist`,
- * `required_scopes`, `terms` (`version`/`url`/`sha256`/`text`), and
- * `endpoints.agent_signup` — the only endpoint.
+ * `required_scopes`, `terms` (`version`/`url`), and `endpoints.agent_signup` —
+ * the only endpoint. The broker fetches the URL-hosted terms document at signup
+ * time and hashes the exact response bytes for the assertion and ToS ledger.
  *
  * The removed vendor fields (`instance_catalog`, `endpoints.provision`,
  * `endpoints.email_signup`, `endpoints.verify_otp`, and
@@ -278,24 +259,8 @@ export const AgentSignupDiscoverySchema = z
       .object({
         version: z.string().min(1),
         url: absoluteProtocolUrl,
-        sha256: sha256Hash,
-        text: z.string().min(1),
       })
-      .passthrough()
-      .superRefine((value, ctx) => {
-        // spec §6: the advertised hash MUST be the SHA-256 of the exact UTF-8
-        // bytes of `text` (no normalization, trimming, or HTML extraction).
-        const expected = computeSha256Prefixed(value.text);
-        if (value.sha256 !== expected) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["sha256"],
-            message:
-              "terms.sha256 must equal the SHA-256 of the exact UTF-8 bytes " +
-              `of terms.text (expected ${expected})`,
-          });
-        }
-      }),
+      .passthrough(),
 
     // `agent_signup` is the only v1 endpoint. The removed vendor endpoints are
     // forbidden and rejected; unknown additive endpoints are preserved.
@@ -483,7 +448,7 @@ function buildRpAttestationClaimsSchema(mode: SchemaMode) {
     rp,
     keys: z
       .array(RpAttestationKeySchema)
-      .min(1)
+      .min(0)
       .max(MAX_ATTESTATION_KEYS, `keys must contain at most ${MAX_ATTESTATION_KEYS} entries`),
   }).superRefine((value, ctx) => {
     // Cross-field rules JSON Schema cannot express (spec §5.2, §5.12).

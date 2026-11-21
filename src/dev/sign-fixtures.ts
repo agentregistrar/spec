@@ -88,6 +88,7 @@ const abuseJti = (label: string): string => `abr_${ulid(`abuse:${label}`)}`;
 
 const ATTESTATION_JTI = {
   domain: attestationJti("valid-domain"),
+  keyless: attestationJti("valid-domain-keyless"),
   entity: attestationJti("valid-entity"),
   rotated: attestationJti("valid-domain-rotated"),
   expired: attestationJti("expired"),
@@ -350,6 +351,13 @@ async function main(): Promise<void> {
     jti: ATTESTATION_JTI.domain,
     keys: [rpKey(rp1)],
   });
+  // v2.0.0 keyless attestation: a domain-verified provider with no registered
+  // RP signing key. `keys: []` is valid (0-8 entries); receipts and abuse
+  // reports require a key and are simply unavailable for this provider.
+  const keylessClaims = attestationClaims({
+    jti: ATTESTATION_JTI.keyless,
+    keys: [],
+  });
   const entityClaims = attestationClaims({
     jti: ATTESTATION_JTI.entity,
     rp: rpBlock({
@@ -424,6 +432,7 @@ async function main(): Promise<void> {
 
   const attestationFiles: [string, string][] = [
     ["valid-domain.jwt", signJws(attestationHeader(broker1), domainClaims, broker1)],
+    ["valid-domain-keyless.jwt", signJws(attestationHeader(broker1), keylessClaims, broker1)],
     ["valid-entity.jwt", signJws(attestationHeader(broker1), entityClaims, broker1)],
     ["valid-domain-rotated.jwt", signJws(attestationHeader(broker1), rotatedClaims, broker1)],
     ["expired.jwt", signJws(attestationHeader(broker1), expiredClaims, broker1)],
@@ -463,14 +472,19 @@ async function main(): Promise<void> {
   // responses (403/404/410/503) carry no JWT and are hand-maintained JSON.
   const jwsByName = new Map(attestationFiles);
   const validDomainJws = jwsByName.get("valid-domain.jwt");
+  const keylessJws = jwsByName.get("valid-domain-keyless.jwt");
   const expiredJws = jwsByName.get("expired.jwt");
-  if (validDomainJws === undefined || expiredJws === undefined) {
+  if (validDomainJws === undefined || keylessJws === undefined || expiredJws === undefined) {
     throw new Error("the attestation fixtures required by the source documents are missing");
   }
   const sourceDir = join(FIXTURES, "attestation-sources");
   await writeJson(join(sourceDir, "ok-broker.json"), {
     status: 200,
     body: { attestation: validDomainJws },
+  });
+  await writeJson(join(sourceDir, "ok-broker-keyless.json"), {
+    status: 200,
+    body: { attestation: keylessJws },
   });
   await writeJson(join(sourceDir, "ok-provider.json"), {
     status: 200,
@@ -741,7 +755,7 @@ async function main(): Promise<void> {
       `  receipts:     ${receiptFiles.length}`,
       `  status:       ${statusFiles.length}`,
       `  abuse:        ${abuseFiles.length}`,
-      "  attestation-source 200 responses: 8",
+      "  attestation-source 200 responses: 9",
       `  discovery documents refreshed from __fixture_removed_attestation_source: ${refreshed}`,
       "  next: git diff --exit-code fixtures/",
     ].join("\n"),

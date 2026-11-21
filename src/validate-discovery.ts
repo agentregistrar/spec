@@ -19,11 +19,10 @@
  * Safety (spec §3.6 / §8.1): only the top-level URL provided by the user and
  * explicitly requested targets (`--probe-*`, and the `attestation.uri` source
  * under `--verify-attestation`) are ever fetched. A source URI is fetched only
- * after the conformance host binding passes. `terms.text` is never executed or
- * interpreted. Every fetch applies a timeout, a bounded read, and a same-origin
- * redirect limit.
+ * after the conformance host binding passes. Provider terms are never fetched
+ * by the validator; the broker fetches `terms.url` at signup time. Every fetch
+ * applies a timeout, a bounded read, and a same-origin redirect limit.
  */
-import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -63,11 +62,6 @@ const DEFAULT_MAX_BYTES = 1024 * 1024; // spec §4: 1 MiB cap
 // ---------------------------------------------------------------------------
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const SHA256_HEX_PATTERN = /^sha256:[0-9a-f]{64}$/;
-
-function sha256Prefixed(content: string): string {
-  return `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`;
-}
 
 // ---------------------------------------------------------------------------
 // Result model.
@@ -100,7 +94,7 @@ interface DocumentMetadata {
   audience: string | null;
   providerName: string | null;
   signupEndpoint: string | null;
-  terms: { version: string | null; url: string | null; sha256: string | null } | null;
+  terms: { version: string | null; url: string | null } | null;
 }
 
 interface RunResult {
@@ -351,7 +345,7 @@ function printHelp(): void {
     "",
     "Safety: only the URL you provide and explicitly requested probe targets are",
     "fetched. URLs found in the document body (including under `extensions`) are",
-    "never followed. `terms.text` is treated as data, never executed.",
+    "never followed. `terms.url` is never fetched by this validator.",
   ];
   console.log(lines.join("\n"));
 }
@@ -614,7 +608,7 @@ function checkRequiredScopes(document: Record<string, unknown>): Check {
 function checkTerms(document: Record<string, unknown>): Check {
   const terms = document.terms;
   if (!isRecord(terms)) {
-    return fail("field.terms", "terms", "terms must be an object with version, url, sha256, and text", {
+    return fail("field.terms", "terms", "terms must be an object with version and url", {
       actual: JSON.stringify(terms ?? null),
     });
   }
@@ -625,47 +619,13 @@ function checkTerms(document: Record<string, unknown>): Check {
   if (!isAbsoluteProtocolUrl(terms.url)) {
     problems.push("terms.url must be an absolute protocol URL (https, localhost dev exception)");
   }
-  if (typeof terms.sha256 !== "string" || !SHA256_HEX_PATTERN.test(terms.sha256)) {
-    problems.push("terms.sha256 must use the form `sha256:<64 lowercase hex characters>`");
-  }
-  if (typeof terms.text !== "string" || terms.text.length === 0) {
-    problems.push("terms.text must be the complete, non-empty ToS text");
-  }
   if (problems.length > 0) {
     return fail("field.terms", "terms", problems.join("; "));
   }
-  return ok("field.terms", "terms", "terms.version, terms.url, terms.sha256, and terms.text have valid shapes");
-}
-
-function checkTermsHash(document: Record<string, unknown>): Check {
-  const terms = document.terms;
-  if (!isRecord(terms) || typeof terms.text !== "string" || terms.text.length === 0) {
-    return skip(
-      "field.terms.sha256",
-      "terms.sha256 recompute",
-      "cannot recompute the digest: terms.text is missing or empty",
-    );
-  }
-  if (typeof terms.sha256 !== "string") {
-    return skip(
-      "field.terms.sha256",
-      "terms.sha256 recompute",
-      "cannot compare the digest: terms.sha256 is missing",
-    );
-  }
-  const expected = sha256Prefixed(terms.text);
-  if (terms.sha256 === expected) {
-    return ok(
-      "field.terms.sha256",
-      "terms.sha256 recompute",
-      `terms.sha256 matches the SHA-256 of the exact UTF-8 bytes of terms.text (${expected})`,
-    );
-  }
-  return fail(
-    "field.terms.sha256",
-    "terms.sha256 recompute",
-    "terms.sha256 must equal the SHA-256 of the exact UTF-8 bytes of terms.text (no normalization, trimming, or HTML extraction)",
-    { expected, actual: terms.sha256 },
+  return ok(
+    "field.terms",
+    "terms",
+    "terms.version and terms.url have valid shapes (the broker fetches terms.url at signup)",
   );
 }
 
@@ -1511,7 +1471,6 @@ function buildMetadata(document: Record<string, unknown>): DocumentMetadata {
       ? {
           version: typeof terms.version === "string" ? terms.version : null,
           url: typeof terms.url === "string" ? terms.url : null,
-          sha256: typeof terms.sha256 === "string" ? terms.sha256 : null,
         }
       : null,
   };
@@ -1620,7 +1579,6 @@ async function checkDocument(
   addCheck(checks, checkIssuerAllowlist(document));
   addCheck(checks, checkRequiredScopes(document));
   addCheck(checks, checkTerms(document));
-  addCheck(checks, checkTermsHash(document));
   addCheck(checks, checkAgentSignup(document));
 
   const findings: ForbiddenFinding[] = [];

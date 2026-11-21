@@ -1,5 +1,5 @@
 {
-  "$comment": "Expected results for the manual fixture harness (`pnpm validate:fixtures`). Regenerate JWS fixtures with `pnpm sign:fixtures`; this file is hand-maintained. A `crossFieldOnly: true` attestation row is valid under the closed JSON Schema but rejected by Zod for a cross-field rule JSON Schema cannot express (here: unique keys[].kid). Discovery rows may assert `checks` (check id -> status or {status, reason, messageExcludes}), `failCheck`, `mode`, and `attestation.reason`; `sourceResponse` points at a `{ status, body, contentType? }` fixture so no run needs a live broker or provider.",
+  "$comment": "Expected results for the manual fixture harness (`pnpm validate:fixtures`). Regenerate JWS fixtures with `pnpm sign:fixtures`; this file is hand-maintained. A `crossFieldOnly: true` attestation row is valid under the closed JSON Schema but rejected by Zod for a cross-field rule JSON Schema cannot express (here: unique keys[].kid). Attestation rows may assert `keysCount` to pin a keyless (`keys: []`) snapshot. Discovery rows may assert `checks` (check id -> status or {status, reason, messageExcludes}), `failCheck`, `mode`, and `attestation.reason`; `sourceResponse` points at a `{ status, body, contentType? }` fixture so no run needs a live broker or provider.",
   "clock": "2026-10-24T00:00:00Z",
   "defaults": {
     "trustedBrokers": [
@@ -127,6 +127,25 @@
           "field.attestation.binding": "pass",
           "schema.json-schema": "pass"
         }
+      }
+    },
+    {
+      "id": "discovery/valid-attestation-broker-keyless--verified",
+      "kind": "discovery",
+      "path": "fixtures/valid-attestation-broker.json",
+      "options": {
+        "verifyAttestation": true,
+        "requireAttestation": true,
+        "sourceResponse": "fixtures/attestation-sources/ok-broker-keyless.json"
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "verified",
+        "reason": null,
+        "mode": "broker",
+        "level": "domain",
+        "conformance": true,
+        "verified": true
       }
     },
     {
@@ -690,6 +709,19 @@
         "status": "verified",
         "producer": true,
         "verifier": true
+      }
+    },
+    {
+      "id": "attestations/valid-domain-keyless",
+      "kind": "attestation",
+      "jwt": "fixtures/attestations/valid-domain-keyless.jwt",
+      "documentOrigin": "https://vaporcloud.example",
+      "options": {},
+      "expect": {
+        "status": "verified",
+        "producer": true,
+        "verifier": true,
+        "keysCount": 0
       }
     },
     {

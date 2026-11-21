@@ -1,4 +1,4 @@
-# Fixtures — `agent-identity-v1` `v1.3.0`
+# Fixtures — `agent-identity-v1` `v2.0.0`
 
 This directory holds every checked-in fixture for the discovery, attestation, receipt, abuse, status,
 and provider-request surfaces, plus the expected results the manual harness compares against.
@@ -25,6 +25,11 @@ and provider-request surfaces, plus the expected results the manual harness comp
 
 The two broker JWKS files are **separate per-issuer files** and are never merged in one file or one
 cache entry.
+
+Discovery fixtures publish URL-hosted terms: `terms` contains only `version` and `url`. `terms.text`
+and `terms.sha256` were removed in `v2.0.0`; the broker fetches `terms.url` at signup time and hashes
+the exact response bytes. Contract G fixtures may carry `keys: []` (0–8 entries): a valid keyless
+attestation for a domain-verified provider without RP signing keys.
 
 ## Frozen clock and deterministic signing
 
@@ -87,8 +92,9 @@ for a rule JSON Schema cannot express (currently: unique `keys[].kid`).
 
 | Fixture | Expected |
 | :--- | :--- |
-| `valid-minimal.json`, `valid-full.json`, `valid-localhost.json` | conformant, no `attestation`, `unverified`, exit `0` |
+| `valid-minimal.json`, `valid-full.json`, `valid-localhost.json` | conformant, no `attestation`, `unverified`, exit `0`; `terms` carries only `version` and `url` (URL-hosted terms) |
 | `valid-attestation-broker.json` | broker mode: `verified`, mode `broker`, level `domain`, exit `0` (offline source response, trusted broker, `--at 2026-10-24T00:00:00Z`) |
+| `valid-attestation-broker.json` with a keyless source | `verified`, mode `broker`, level `domain`, exit `0`; `keys: []` is a valid attestation |
 | `valid-attestation-provider.json` | provider mode on the discovery origin: `verified`, mode `provider`, exit `0` |
 | `valid-attestation-broker.json` without `--verify-attestation` | conformant, `not_checked`, exit `0` |
 | `invalid-attestation-mode.json` (`mode: "embedded"`) | conformance failure, exit `1`, `field.attestation.mode` / `attestation_mode_invalid`; `attestation.status` is `not_checked`, not `invalid` |
@@ -117,6 +123,7 @@ Full broker/provider requests in a live run use the same flags without `--source
 | Fixture | Body | Expected |
 | :--- | :--- | :--- |
 | `ok-broker.json`, `ok-provider.json` | `{ "attestation": "<valid-domain JWS>" }` | valid source document (mode-independent) |
+| `ok-broker-keyless.json` | `{ "attestation": "<valid-domain-keyless JWS>" }` (`keys: []`) | valid source document; verification is `verified` |
 | `ok-expired.json` | `{ "attestation": "<expired JWS>" }` | valid source document; verification reports `expired` at a later clock |
 | `ok-wrapped-token.json` | `{ "token": "<JWS>" }` | invalid: the source field is `attestation`, not `token` |
 | `ok-raw-jwt-body.json` | `"<JWS>"` | invalid: a raw JWT body is not a source document |
@@ -134,6 +141,7 @@ Full broker/provider requests in a live run use the same flags without `--source
 | Fixture | Verification | Producer mode | Verifier mode |
 | :--- | :--- | :--- | :--- |
 | `valid-domain.jwt` | `verified` | valid | valid |
+| `valid-domain-keyless.jwt` | `verified` (`keys: []`) | valid | valid |
 | `valid-entity.jwt` | `verified` | valid | valid |
 | `valid-domain-rotated.jwt` | `verified` (two keys, one retiring) | valid | valid |
 | `expired.jwt` | `expired` (at 2026-11-30) | valid | valid |

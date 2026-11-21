@@ -1,10 +1,10 @@
 # Discovery Conformance and Attestation Validator (`agent-identity-v1`)
 
 - **Source:** `src/validate-discovery.ts` — run with `pnpm validate:discovery`.
-- **Package:** `@agentregistrar/discovery` `1.3.2`, licensed **Apache-2.0**. It is self-contained and
-  source-first: `pnpm install` from a clean clone, then run the CLI. The `v1.3.2` tag publishes it to
+- **Package:** `@agentregistrar/discovery` `2.0.0`, licensed **Apache-2.0**. It is self-contained and
+  source-first: `pnpm install` from a clean clone, then run the CLI. The `v2.0.0` tag publishes it to
   npm. Run it from this repository, or after the tag exists use the pinned git dependency
-  (`github:agentregistrar/spec#v1.3.2`). There is no `bin` entry — invoke it with
+  (`github:agentregistrar/spec#v2.0.0`). There is no `bin` entry — invoke it with
   `pnpm validate:discovery`.
 - **Normative references:** [`agent-identity-v1.md`](./agent-identity-v1.md),
   [`scope-boundaries.md`](./scope-boundaries.md).
@@ -15,8 +15,9 @@ The validator is the objective mechanism behind the rule “a Relying Party that
 `agent-identity-v1` support MUST publish a valid discovery document.” It reports **two independent
 results**:
 
-1. **Document conformance** — schema, ToS hash, scope boundary, field rules, and the `attestation`
-   object's mode/URI/host binding. This never contacts an RP broker.
+1. **Document conformance** — schema, URL-hosted terms shape, scope boundary, field rules, and the
+   `attestation` object's mode/URI/host binding. This never contacts an RP broker or fetches
+   `terms.url`.
 2. **Attestation verification** — optional, opt-in fetching of the source named by `attestation.uri`
    and local verification of the returned Contract G JWS. Only this can contact the attestation source
    and the issuing broker, and only when explicitly requested.
@@ -36,7 +37,9 @@ Given a discovery URL or a local JSON file, the validator:
 2. Validates the body against `AgentSignupDiscoverySchema` and against
    `agent-signup.schema.json`. Zod + the written specification win; any divergence between the two
    schemas is reported, never hidden.
-3. Recomputes the SHA-256 over the exact UTF-8 bytes of `terms.text` and fails on mismatch.
+3. Checks `terms` as URL-hosted terms: `version` is a non-empty string and `url` is an absolute
+   protocol URL. The validator never fetches `terms.url`; the broker does that at signup and hashes
+   the exact response bytes. Removed `terms.text` / `terms.sha256` fields, if present, are ignored.
 4. Fails any forbidden vendor capability surface **at any nesting depth — including under
    `extensions`** — and warns (without failing) on unknown top-level fields and non-reverse-DNS
    `extensions` keys.
@@ -198,7 +201,7 @@ Exit status is the contract; the JSON is evidence. The v1.3.0 additions:
 ```json
 {
   "validator": "agent-identity-v1",
-  "validatorVersion": "1.3.2",
+  "validatorVersion": "2.0.0",
   "valid": true,
   "exitCode": 0,
   "conformance": { "valid": true, "evaluated": true, "errors": [], "warnings": [] },
@@ -371,7 +374,8 @@ warnings only, so producers can evolve additively without silently losing visibi
 - For a trusted issuer without `--jwks`, broker metadata is fetched from that issuer's
   `/.well-known/agent-broker.json`; only a validated, same-origin HTTPS `jwks_uri` is followed,
   otherwise the fixed `/.well-known/jwks.json` fallback is used.
-- `terms.text` and all document content are treated as data and are never executed or interpreted.
+- `terms.url` and all document content are treated as data and are never executed or interpreted.
+  The validator does not fetch `terms.url`.
 - Every fetch applies the timeout, the 1 MiB read cap, and the three-hop same-origin redirect limit.
 - JWKS are cached per `iss` and never merged; `--jwks` applies to one issuer.
 - `http://localhost` / `http://127.0.0.1` are permitted for development only. The specific development
@@ -388,9 +392,9 @@ Both are **manual harnesses, not test frameworks** (`AGENTS.md` forbids tests in
 Reads the expected result for every standalone fixture from `fixtures/expected.json`, exercises the
 same code as the CLI, and exits `0` (all rows match) or `1` (a row differs). It covers the discovery
 matrix (including the `attestation` modes, host binding, the removed field, and typed broker
-403/404/410/503 rows), every attestation JWS (status plus producer/verifier schema mode), source
-documents, receipts, abuse reports, status responses, broker metadata, and provider request/response
-examples. See [`fixtures/README.md`](./fixtures/README.md).
+403/404/410/503 rows), every attestation JWS (status plus producer/verifier schema mode, including the
+keyless `keys: []` row), source documents, receipts, abuse reports, status responses, broker metadata,
+and provider request/response examples. See [`fixtures/README.md`](./fixtures/README.md).
 
 ### `pnpm validate:registry [path] [--json]`
 
@@ -404,7 +408,7 @@ unparseable. `--json` emits `{valid, exitCode, errors, warnings}`.
 | Field | Type | Notes |
 | :--- | :--- | :--- |
 | `validator` | string | Always `"agent-identity-v1"`. |
-| `validatorVersion` | string | The `VALIDATOR_VERSION` constant, `"1.3.2"`. |
+| `validatorVersion` | string | The `VALIDATOR_VERSION` constant, `"2.0.0"`. |
 | `mode` | `"file"` \| `"url"` | How the document was obtained. |
 | `source` | string | The path or URL that was validated. |
 | `valid` | boolean | `true` iff `exitCode === 0` (the run result). |
@@ -415,7 +419,7 @@ unparseable. `--json` emits `{valid, exitCode, errors, warnings}`.
 | `audience` | string \| null | `audience` from the document, if present. |
 | `providerName` | string \| null | `provider_name`, if present. |
 | `signupEndpoint` | string \| null | `endpoints.agent_signup`, if present. |
-| `terms` | object \| null | `{ version, url, sha256 }` (the digest that was recomputed). |
+| `terms` | object \| null | `{ version, url }` from the document; the validator does not fetch or hash `terms.url`. |
 | `fetchFailure` | string \| null | Non-null only on exit `2`. |
 | `counts` | object | `{ passed, failed, warnings, probes }` — stable keys. |
 | `checks` | array | One entry per document check: `{ id, title, status, message, expected?, actual?, path? }`. |
