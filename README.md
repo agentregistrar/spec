@@ -125,7 +125,8 @@ commit on `main`, and has matching release notes. It then publishes to npm and c
 Release from `release-notes-vX.Y.Z.md`. Provenance is generated automatically. Never run a local
 `npm publish`, never use an npm token, and never dispatch the workflow separately from a tag. To
 retry a failed release, re-run the workflow for that tag; do not move or delete a tag after npm has
-accepted the version.
+accepted the version. The `v*` namespace is protected by the **Protect released version tags**
+repository ruleset, which blocks updates and deletions of matching tags.
 
 ## Specification release
 
