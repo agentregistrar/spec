@@ -106,15 +106,26 @@ The seven protocol schemas and the registry schema are listed in `files` and exp
 subpaths (for example `@agentregistrar/discovery/agent-signup.schema.json`). The package is
 **source-first**: the npm tarball ships the TypeScript sources (no build step). Consumers therefore
 need a toolchain that transpiles dependencies (for example Next.js `transpilePackages` or `tsx`).
-Install it from npm, or use the pinned git dependency (`github:agentregistrar/spec#v2.0.0`) once the
-tag exists. The package declares no `bin` entry — run the CLI with `pnpm validate:discovery`.
+Install it from npm, or use the pinned git dependency (`github:agentregistrar/spec#v2.0.0`). The
+package declares no `bin` entry — run the CLI with `pnpm validate:discovery`.
 
 ### Releasing the package
 
-Publishing uses **npm trusted publishing (OIDC)** — no long-lived npm token. Bump `version` in
-`package.json`, merge to `main`, tag the merge commit `v2.0.0`, then run the `Publish package`
-workflow (`.github/workflows/publish.yml`, environment `npm-publish`) from `main`. Provenance is
-generated automatically. Never run a local `npm publish` and never use an npm token.
+Publishing is **tag-driven** and uses **npm trusted publishing (OIDC)** — no long-lived npm token.
+Bump `version` in `package.json`, add `release-notes-vX.Y.Z.md`, and merge to `main`. Then create and
+push an annotated tag on that merge commit:
+
+```bash
+git tag -a vX.Y.Z -m "agent-identity-v1 vX.Y.Z"
+git push origin vX.Y.Z
+```
+
+The tag push runs `publish.yml`, which verifies that the tag matches `package.json`, points to a
+commit on `main`, and has matching release notes. It then publishes to npm and creates the GitHub
+Release from `release-notes-vX.Y.Z.md`. Provenance is generated automatically. Never run a local
+`npm publish`, never use an npm token, and never dispatch the workflow separately from a tag. To
+retry a failed release, re-run the workflow for that tag; do not move or delete a tag after npm has
+accepted the version.
 
 ## Specification release
 
