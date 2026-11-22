@@ -67,7 +67,19 @@ eliminating the `agent-identity-v1 (v2.0.0)` naming mismatch.
 
 ---
 
-## 3. Validation evidence
+## 3. Migration checklist
+
+1. **Broker metadata.** Serve `/.well-known/agent-broker.json` with `protocol_versions` containing
+   `"2.0"` instead of `"agent-identity-v1"`.
+2. **Discovery.** Publish `"protocol": "agent-identity-protocol"` and add the required
+   `"protocol_version": "2.0"` to `/.well-known/agent-signup.json`.
+3. **RP attestation audience.** Issue and verify Contract G RP attestations and Contract I status
+   responses with `"aud": "agent-identity-protocol"` instead of `"agent-identity-v1"`.
+4. **Validator check.** Run `npx @agentregistrar/discovery validate <url-or-file> --json` (or
+   `pnpm validate:discovery ...` from a clone) and confirm `valid: true`; read `protocol` and
+   `validatorVersion` from the output.
+
+## 4. Validation evidence
 
 No test framework is added (`AGENTS.md`). The manual harnesses were run from this repository:
 
@@ -80,7 +92,7 @@ No test framework is added (`AGENTS.md`). The manual harnesses were run from thi
 
 ---
 
-## 4. Related artifacts
+## 5. Related artifacts
 
 - Normative spec: [`agent-identity-protocol.md`](./agent-identity-protocol.md)
 - Implementation guide: [`implementing-agent-identity-protocol.md`](./implementing-agent-identity-protocol.md)

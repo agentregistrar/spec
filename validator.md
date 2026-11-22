@@ -1,11 +1,13 @@
 # Discovery Conformance and Attestation Validator (`agent-identity-protocol`)
 
-- **Source:** `src/validate-discovery.ts` — run with `pnpm validate:discovery`.
-- **Package:** `@agentregistrar/discovery` `2.0.0`, licensed **Apache-2.0**. It is self-contained and
-  source-first: `pnpm install` from a clean clone, then run the CLI. The `v2.0.0` tag publishes it to
-  npm. Run it from this repository, or after the tag exists use the pinned git dependency
-  (`github:agentregistrar/spec#v2.0.0`). There is no `bin` entry — invoke it with
-  `pnpm validate:discovery`.
+- **Source:** `src/validate-discovery.ts`, published with a CLI `bin` as
+  `@agentregistrar/discovery` (**Apache-2.0**).
+- **Usage:** `npx @agentregistrar/discovery validate <url-or-file> [flags]` (or a direct
+  `npx @agentregistrar/discovery <url-or-file>`). From a clone of this repository, use
+  `pnpm validate:discovery <url-or-file> [flags]`.
+- **Version:** the package version comes from `package.json`. Run
+  `npx @agentregistrar/discovery --version` or read `validatorVersion` in the `--json` output; do not
+  pin a patch version in this guide.
 - **Normative references:** [`agent-identity-protocol.md`](./agent-identity-protocol.md),
   [`scope-boundaries.md`](./scope-boundaries.md).
 - **Related harnesses:** `pnpm validate:fixtures` (standalone JWS/schema matrix) and
@@ -201,7 +203,7 @@ Exit status is the contract; the JSON is evidence. The v1.3.0 additions:
 ```json
 {
   "validator": "agent-identity-protocol",
-  "validatorVersion": "2.0.0",
+  "validatorVersion": "<package version>",
   "valid": true,
   "exitCode": 0,
   "conformance": { "valid": true, "evaluated": true, "errors": [], "warnings": [] },
@@ -408,7 +410,7 @@ unparseable. `--json` emits `{valid, exitCode, errors, warnings}`.
 | Field | Type | Notes |
 | :--- | :--- | :--- |
 | `validator` | string | Always `"agent-identity-protocol"`. |
-| `validatorVersion` | string | The `VALIDATOR_VERSION` constant, `"2.0.0"`. |
+| `validatorVersion` | string | The `VALIDATOR_VERSION` constant, derived from `package.json`. |
 | `mode` | `"file"` \| `"url"` | How the document was obtained. |
 | `source` | string | The path or URL that was validated. |
 | `valid` | boolean | `true` iff `exitCode === 0` (the run result). |

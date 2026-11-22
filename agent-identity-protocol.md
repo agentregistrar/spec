@@ -1,16 +1,16 @@
 # Agent Identity Protocol — Relying Party Discovery (`agent-signup.json`)
 
-- **Status:** Normative specification — `v2.1.0`. Maintained in [`agentregistrar/spec`](https://github.com/agentregistrar/spec).
+- **Status:** Normative specification — v2.1.1. Maintained in [`agentregistrar/spec`](https://github.com/agentregistrar/spec).
 - **Protocol identifier:** `agent-identity-protocol`
 - **Protocol version:** `2.0`
 - **Well-known URI:** `GET /.well-known/agent-signup.json`
-- **Specification release:** `v2.1.0` (see §1.3)
+- **Specification release:** v2.1.1 (see §1.3)
 - **Companion document:** [`scope-boundaries.md`](./scope-boundaries.md) — the identity-vs-vendor boundary and the future-change review checklist.
 
 This document is the single normative definition of the `agent-signup.json` discovery contract and the
 brokered signup handshake. The historical reference implementation's documentation carries a short
 summary that points here. Where any other document disagrees with this specification, this
-specification wins for identity-only v1.
+specification wins for the Agent Identity Protocol.
 
 ---
 
@@ -40,12 +40,14 @@ scope.
 
 | Version | Date | Change |
 | :--- | :--- | :--- |
-| `v2.0.0` | 2026-11-21 | **Protocol simplification (breaking spec release).** Discovery `terms` becomes URL-hosted: only `version` and `url` are required, and the broker fetches `terms.url` at signup time and hashes the exact response bytes. `terms.text` and `terms.sha256` are removed from discovery and are no longer required or validated. Contract G `keys` allows **0–8** entries, so a domain-verified provider without RP signing keys receives a valid keyless attestation (`keys: []`). The `protocol` id stays `agent-identity-protocol`; the signup handshake and assertion format are unchanged. See [`release-notes-v2.0.0.md`](./release-notes-v2.0.0.md). |
+| `v2.1.1` | 2026-11-22 | **Package and documentation patch.** Ships the compiled JS package with an `npx @agentregistrar/discovery` CLI `bin` (`validate <url-or-file>`, a direct target, and `--version`), derives `VALIDATOR_VERSION` from `package.json`, adds the `pnpm check:release` consistency gate, and fixes the `v2.1.0` documentation errata. No wire format, schema, fixture, or validator-behavior changes. See [`release-notes-v2.1.1.md`](./release-notes-v2.1.1.md). |
+| `v2.1.0` | 2026-11-21 | **Protocol rename and version split.** Renames the protocol from `agent-identity-v1` to the Agent Identity Protocol (`protocol: "agent-identity-protocol"`, with `aud: "agent-identity-protocol"` in attestations) and separates the protocol name from the wire version (`protocol_version: "2.0"` in discovery and `protocol_versions: ["2.0"]` in broker metadata). Adds the `field.protocol_version` conformance check. The signup handshake and assertion format are unchanged. See [`release-notes-v2.1.0.md`](./release-notes-v2.1.0.md). |
+| `v2.0.0` | 2026-11-21 | **Protocol simplification (breaking spec release).** Discovery `terms` becomes URL-hosted: only `version` and `url` are required, and the broker fetches `terms.url` at signup time and hashes the exact response bytes. `terms.text` and `terms.sha256` are removed from discovery and are no longer required or validated. Contract G `keys` allows **0–8** entries, so a domain-verified provider without RP signing keys receives a valid keyless attestation (`keys: []`). The `protocol` id stays `agent-identity-v1`; the signup handshake and assertion format are unchanged. See [`release-notes-v2.0.0.md`](./release-notes-v2.0.0.md). |
 | `v1.3.2` | 2026-11-14 | **Documentation correction only.** Fixes two normative contradictions in the `v1.3.1` text: issuance with no active key is `409 no_active_key`, not `403 provider_not_eligible`; and the "binding unchecked" rule applies to a `provider` source without a fetch origin, while a `broker` source is always checked from `issuer_allowlist`. No wire format, schema, validator behavior, fixture, or attestation claim changes. |
 | `v1.3.1` | 2026-11-13 | **Contract-text correction only.** Makes the published normative text match the D18 decisions that `v1.3.0` shipped without: Contract H attestation issuance is not plan-, billing-, or subscription-gated, and the client policy contract is `no_verify`/`verify`/`strict` with a separate `blocked` action and a `verify` default. No wire format, schema, validator behavior, fixture, or attestation claim changes. |
-| `v1.3.0` | 2026-11-13 | **Breaking discovery change.** The embedded `rp_attestation` field is removed and replaced by one OPTIONAL `attestation` object (`mode`: `broker` \| `provider`, `uri` naming a stable attestation source). A document that still carries `rp_attestation` is non-conformant; there is no compatibility field, embedded fallback, or dual publication. The attestation JWT, claims, signature, key snapshot, 24-hour lifetime, origin/audience binding, and the Contract F receipt/abuse bodies are unchanged. The wire protocol id stays `agent-identity-protocol`. |
-| `v1.2.0` | 2026-10-24 | Adds Contracts G/H/I, optional `rp_attestation`, authenticated D.2, RP-signed E, authenticated F, the trust model, assurance levels, verification rules, and the status/error taxonomy. **The wire protocol id stays `agent-identity-protocol`; `rp_attestation` is OPTIONAL and `v1.0.0`/`v1.1.0` documents remain conformant.** Superseded by `v1.3.0`, which removes `rp_attestation` from discovery: a `v1.2.0` document is no longer conformant. |
-| `v1.1.0` | 2026-10-18 | Additive clarifications: replay vs resolve (idempotent resolution, `assertion_replayed` reserved for conflicting reuse), the optional `resolution: "created" \| "resolved"` success field, acceptance lifetime, a knowledge-of-text restatement, recommended account identity keys (§9.1), and credential handoff & recovery (§12.5). **No field removals or renames; the wire protocol id stays `agent-identity-protocol`; `v1.0.0` implementors remain conformant.** |
+| `v1.3.0` | 2026-11-13 | **Breaking discovery change.** The embedded `rp_attestation` field is removed and replaced by one OPTIONAL `attestation` object (`mode`: `broker` \| `provider`, `uri` naming a stable attestation source). A document that still carries `rp_attestation` is non-conformant; there is no compatibility field, embedded fallback, or dual publication. The attestation JWT, claims, signature, key snapshot, 24-hour lifetime, origin/audience binding, and the Contract F receipt/abuse bodies are unchanged. The wire protocol id stays `agent-identity-v1`. |
+| `v1.2.0` | 2026-10-24 | Adds Contracts G/H/I, optional `rp_attestation`, authenticated D.2, RP-signed E, authenticated F, the trust model, assurance levels, verification rules, and the status/error taxonomy. **The wire protocol id stays `agent-identity-v1`; `rp_attestation` is OPTIONAL and `v1.0.0`/`v1.1.0` documents remain conformant.** Superseded by `v1.3.0`, which removes `rp_attestation` from discovery: a `v1.2.0` document is no longer conformant. |
+| `v1.1.0` | 2026-10-18 | Additive clarifications: replay vs resolve (idempotent resolution, `assertion_replayed` reserved for conflicting reuse), the optional `resolution: "created" \| "resolved"` success field, acceptance lifetime, a knowledge-of-text restatement, recommended account identity keys (§9.1), and credential handoff & recovery (§12.5). **No field removals or renames; the wire protocol id stays `agent-identity-v1`; `v1.0.0` implementors remain conformant.** |
 | `v1.0.0` | 2026-10-17 | Initial identity-only v1 specification. Discovery is identity-only; vendor catalogs, provisioning endpoints, legacy OTP endpoints, and broker receipt callbacks are removed from the protocol and are forbidden. Adds the optional signed post-signup `context` pointer. |
 
 **Release record.** `v1.0.0` was recorded on **2026-10-17**, once the identity-only
@@ -78,7 +80,7 @@ publication: the tag, npm release, and GitHub release follow the merge (release 
 conformance never requires a live RP broker: only `--verify-attestation` contacts one.
 
 **Release record (`v1.3.0`).** `v1.3.0` is the **2026-11-13** revision and the first **breaking
-discovery** revision of `agent-identity-protocol`. It removes the embedded `rp_attestation` carrier and
+discovery** revision of `agent-identity-v1`. It removes the embedded `rp_attestation` carrier and
 replaces it with one OPTIONAL `attestation` object that names a stable source URI (§5.2, §5.4, §14).
 The release ships the updated [`agent-signup.schema.json`](./agent-signup.schema.json), the new
 [`attestation-source.schema.json`](./attestation-source.schema.json), the fixture matrix in
@@ -91,7 +93,7 @@ non-conformant, and the validator reports `rp_attestation_removed`. Providers mu
 with the new object; see the release notes' migration steps.
 
 **Release record (`v1.3.1`).** `v1.3.1` is a **contract-text correction** patch on `v1.3.0`, shipped
-under `protocol` `agent-identity-protocol` with **no** wire, schema, fixture, or validator-behavior change.
+under `protocol` `agent-identity-v1` with **no** wire, schema, fixture, or validator-behavior change.
 It corrects two normative statements that `v1.3.0` omitted: Contract H attestation issuance is not
 plan-, billing-, or subscription-gated (§15.3, §15.4), and the client policy contract is
 `no_verify`/`verify`/`strict` with a separate `blocked` action, a `verify` default, and no `enforced`
@@ -101,7 +103,7 @@ already-decided D18 contract; no attestation claim, discovery field, reason code
 See [`release-notes-v1.3.1.md`](./release-notes-v1.3.1.md).
 
 **Release record (`v1.3.2`).** `v1.3.2` is a **documentation-correction** patch on `v1.3.1`, shipped
-under `protocol` `agent-identity-protocol` with **no** wire, schema, fixture, or validator-behavior change.
+under `protocol` `agent-identity-v1` with **no** wire, schema, fixture, or validator-behavior change.
 It resolves two normative contradictions in the published text: §15.3 now splits a non-active
 provider / non-verified origin (`403 provider_not_eligible`) from a missing active key
 (`409 no_active_key`, §15.5), and §14.2 step 2 now scopes the unchecked-binding rule to a `provider`
@@ -131,16 +133,31 @@ The release ships the updated [`agent-signup.schema.json`](./agent-signup.schema
 `attestations/valid-domain-keyless.jwt`), the validator/package version `2.0.0`, and
 [`release-notes-v2.0.0.md`](./release-notes-v2.0.0.md).
 
+**Release record (`v2.1.0`).** `v2.1.0` is the **2026-11-21** revision. It renames the protocol to the
+Agent Identity Protocol (`protocol: "agent-identity-protocol"`) and separates the protocol name from
+the wire version (`protocol_version: "2.0"` in discovery, `protocol_versions: ["2.0"]` in broker
+metadata, and `aud: "agent-identity-protocol"` in Contract G and I JWS). It updates the specification
+file name and schema `$id` URLs, adds the `field.protocol_version` conformance check, and regenerates
+the fixtures. The signup handshake and assertion format are unchanged. See
+[`release-notes-v2.1.0.md`](./release-notes-v2.1.0.md).
+
+**Release record (`v2.1.1`).** `v2.1.1` is the **2026-11-22** package and documentation patch. It ships
+the compiled JS package with the `npx @agentregistrar/discovery` CLI `bin`, derives
+`VALIDATOR_VERSION` from `package.json`, adds the `pnpm check:release` gate, and closes the
+documentation errata from `v2.1.0`. No wire format, schema, fixture, or validator-behavior change. See
+[`release-notes-v2.1.1.md`](./release-notes-v2.1.1.md).
+
 ### 1.3 Version identity
 
-- The protocol version is carried **major-only** in the discovery document's `protocol` field:
-  `agent-identity-protocol`.
-- This specification revision is `v2.0.0`. Minor/patch revisions are additive and do not change
-  the `protocol` value; breaking changes require a new `protocol` value and a new discovery path (§13).
-  `v2.0.0` simplifies two optional/parameter surfaces — URL-hosted `terms` and keyless Contract G
-  attestations — while the signup handshake and assertion/attestation wire formats stay
-  `agent-identity-protocol`. The `protocol` id identifies the handshake, not the terms carrier or the RP key
-  snapshot. Additive v1 changes are recorded in the changelog above and must pass the
+- `protocol` carries the stable protocol name: `"agent-identity-protocol"`. `protocol_version`
+  carries the wire version: `"2.0"`. Discovery requires both fields (§5.1); `protocol` is not a
+  version.
+- Specification and package releases follow semantic versioning (`v2.1.1`; see `package.json`, the
+  changelog above, and `release-notes-*.md`). A breaking wire change requires a new
+  `protocol_version` value and a new discovery path (§13).
+- `v2.1.0` renamed the protocol from `agent-identity-v1` to the Agent Identity Protocol and separated
+  the name from the wire version. The signup handshake and the assertion/attestation wire formats
+  remain version `2.0`. Additive changes are recorded in the changelog above and must pass the
   [`scope-boundaries.md`](./scope-boundaries.md) review checklist; the process is written down in
   [`release-notes-v1.0.0.md`](./release-notes-v1.0.0.md) §3.
 - The embedded `rp_attestation` carrier is **removed** in `v1.3.0`. A document that still carries it is
@@ -962,21 +979,23 @@ lifecycle:
 
 ## 13. Versioning, Extension & Deprecation Policy
 
-- `protocol` carries the **major** version only: `agent-identity-protocol`.
-- Additive identity fields are allowed within v1. Consumers **MUST** ignore unknown fields.
+- `protocol` carries the stable name (`"agent-identity-protocol"`); `protocol_version` carries the
+  wire version (`"2.0"`).
+- Additive identity fields are allowed within wire major version 2. Consumers **MUST** ignore
+  unknown fields.
 - Vendor catalogs, provisioning endpoints, resource metadata, and API-usage documentation are **not**
   additive protocol fields; they belong in the post-signup guide.
 - Producers **SHOULD** namespace non-capability vendor metadata under `extensions.<reverse-dns>`.
-- A breaking change **MUST** use a new `protocol` value and a new discovery path (for example
-  `agent-signup-v2.json`). The v1 path **MUST NOT** silently change semantics.
+- A breaking wire change **MUST** use a new `protocol_version` value and a new discovery path (for
+  example `agent-signup-v2.json`). The current path **MUST NOT** silently change semantics.
 - An OPTIONAL discovery field may be removed in a breaking **specification** release without a new
-  `protocol` value only when no conformant document is required to carry it and the release ships a
-  migration note, so a document that omits the field stays conformant. `v1.3.0` removes
+  `protocol_version` value only when no conformant document is required to carry it and the release
+  ships a migration note, so a document that omits the field stays conformant. `v1.3.0` removes
   `rp_attestation` on exactly that basis (§14.7); it is not dual-published and has no alias.
 - The public spec URL **SHOULD** be versioned; the optional `spec` field lets agents and humans find the
   exact document.
 - A future version **SHOULD** be dual-published during a migration window. The changelog (§1.2) records
-  additive v1 changes.
+  additive changes.
 
 ---
 
@@ -1747,6 +1766,7 @@ document, in `extensions`, or in a cached copy from another origin.
 - [ ] `GET /.well-known/agent-signup.json` returns `200` with `Content-Type: application/json`.
 - [ ] `GET` returns `404`/`410` (never `401`/`403`) when the service does not support the protocol.
 - [ ] `protocol` is exactly `agent-identity-protocol`.
+- [ ] `protocol_version` is exactly `"2.0"`.
 - [ ] `audience`, `provider_name`, a non-empty `issuer_allowlist`, and unique `required_scopes`
       (including `tos:accept`) are present.
 - [ ] `terms.url` and `terms.version` are present, `terms.url` is absolute HTTPS (localhost

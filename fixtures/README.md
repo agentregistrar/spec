@@ -1,4 +1,4 @@
-# Fixtures — `agent-identity-protocol` `v2.0.0`
+# Fixtures — Agent Identity Protocol (wire 2.0)
 
 This directory holds every checked-in fixture for the discovery, attestation, receipt, abuse, status,
 and provider-request surfaces, plus the expected results the manual harness compares against.

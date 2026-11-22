@@ -2411,7 +2411,7 @@ export async function runDiscoveryCli(argv: string[]): Promise<void> {
     options = parseArgs(argv);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
-    console.error("Run `pnpm validate:discovery --help` for usage.");
+    console.error("Run `npx @agentregistrar/discovery --help` or `pnpm validate:discovery --help` for usage.");
     process.exitCode = 2;
     return;
   }

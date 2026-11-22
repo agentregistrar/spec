@@ -15,11 +15,12 @@ vendor catalog, provisioning, or resource surface in the protocol.
 
 | Path | Description |
 | :--- | :--- |
-| [`agent-identity-protocol.md`](./agent-identity-protocol.md) | Normative specification for the Agent Identity Protocol (`v2.1.0`, wire protocol version `2.0`). |
+| [`agent-identity-protocol.md`](./agent-identity-protocol.md) | Normative specification for the Agent Identity Protocol (wire protocol version `2.0`; see §1.2 for the changelog). |
 | [`scope-boundaries.md`](./scope-boundaries.md) | Identity-vs-vendor scope rulebook, including RP identity, and the future-change checklist. |
 | [`implementing-agent-identity-protocol.md`](./implementing-agent-identity-protocol.md) | Relying Party implementation guide (provider identity, attestation modes, receipts, abuse). |
 | [`validator.md`](./validator.md) | Conformance, attestation, fixture, and registry validator guide. |
-| [`release-notes-v2.1.0.md`](./release-notes-v2.1.0.md) | Release notes for the `v2.1.0` Agent Identity Protocol rename and `protocol_version: "2.0"` split (this branch). |
+| [`release-notes-v2.1.1.md`](./release-notes-v2.1.1.md) | Release notes for the `v2.1.1` compiled package, CLI `bin`, and documentation patch. |
+| [`release-notes-v2.1.0.md`](./release-notes-v2.1.0.md) | Release notes for the `v2.1.0` Agent Identity Protocol rename and `protocol_version: "2.0"` split. |
 | [`release-notes-v2.0.0.md`](./release-notes-v2.0.0.md) | Release notes for the `v2.0.0` URL-terms and keyless-attestation release. |
 | [`release-notes-v1.3.2.md`](./release-notes-v1.3.2.md) | Release notes for the `v1.3.2` documentation patch. |
 | [`release-notes-v1.3.1.md`](./release-notes-v1.3.1.md) | Release notes for the `v1.3.1` contract-text patch. |
@@ -36,11 +37,25 @@ vendor catalog, provisioning, or resource surface in the protocol.
 | [`abuse-report.schema.json`](./abuse-report.schema.json) | JSON Schema for Contract D.2 abuse-report claims. |
 | [`fixtures/`](./fixtures) | Conformance and attestation fixtures, per-issuer JWKS, `expected.json`, and the matrix in [`fixtures/README.md`](./fixtures/README.md). |
 | [`registry/`](./registry) | Implementation registry (human-readable + machine-readable + schema). |
-| `src/` | `@agentregistrar/discovery` — Zod schemas, the conformance/attestation validator, the fixture harness, and the registry validator. |
+| `src/` | TypeScript sources for `@agentregistrar/discovery` - Zod schemas, the conformance/attestation validator, the fixture harness, and the registry validator. |
+| `dist/` | Compiled JS package with type declarations and the CLI `bin` (`pnpm build`). |
 
 ## Quick start
 
-Install dependencies and run the conformance validator against a discovery URL or a local file:
+Run the conformance validator without cloning this repository:
+
+```bash
+# Local file
+npx @agentregistrar/discovery validate fixtures/valid-full.json
+
+# Live URL (HTTPS required; http://localhost / http://127.0.0.1 allowed for development)
+npx @agentregistrar/discovery validate https://example.com/.well-known/agent-signup.json
+
+# Machine-readable result
+npx @agentregistrar/discovery validate https://example.com/.well-known/agent-signup.json --json | jq .
+```
+
+For a local clone, install dependencies and use the package scripts with the same arguments:
 
 ```bash
 pnpm install
@@ -48,7 +63,7 @@ pnpm install
 # Local file
 pnpm validate:discovery fixtures/valid-full.json
 
-# Live URL (HTTPS required; http://localhost / http://127.0.0.1 allowed for development)
+# Live URL
 pnpm validate:discovery https://example.com/.well-known/agent-signup.json
 
 # Machine-readable result (pass --silent so stdout is pure JSON)
@@ -84,8 +99,8 @@ verification result, never a conformance failure.
 
 ## Package
 
-`@agentregistrar/discovery` (**`2.1.0`**, **Apache-2.0**) is the self-contained package in this
-repository. It has no private dependencies:
+`@agentregistrar/discovery` (**Apache-2.0**) is the self-contained package in this repository. It has
+no private dependencies and ships compiled JavaScript in `dist/`:
 
 - `src/schema.ts` — the canonical Zod schemas: `AgentSignupDiscoverySchema`, `AttestationModeSchema`,
   `AttestationSourceSchema`, `AttestationSourceDocumentSchema`, `RpAttestationClaimsSchema`,
@@ -95,6 +110,10 @@ repository. It has no private dependencies:
   `parseRpAttestationProducer`, `parseRpAttestationVerifier`, `parseAttestationSourceDocument`, and
   `parseAttestationStatusVerifier`. `src/index.ts` re-exports them.
 - `src/validate-discovery.ts` — the conformance + attestation validator CLI (`pnpm validate:discovery`).
+- `dist/cli.js` - the published `bin`; `npx @agentregistrar/discovery validate <url-or-file>` (or a
+  direct target) runs the validator, and `npx @agentregistrar/discovery --version` prints the package
+  version. `pnpm build` regenerates `dist/`.
+- `dist/index.js` / `dist/index.d.ts` - the compiled root exports for the schemas, parsers, and constants.
 - `src/validate-fixtures.ts`, `src/validate-registry.ts` — manual harnesses (`pnpm validate:fixtures`,
   `pnpm validate:registry`). `src/dev/sign-fixtures.ts` regenerates the deterministic JWS fixtures
   (`pnpm sign:fixtures`).
@@ -104,17 +123,17 @@ repository. It has no private dependencies:
   shipped so consumers and the packaged validators work outside this repository.
 
 The seven protocol schemas and the registry schema are listed in `files` and exposed as `exports`
-subpaths (for example `@agentregistrar/discovery/agent-signup.schema.json`). The package is
-**source-first**: the npm tarball ships the TypeScript sources (no build step). Consumers therefore
-need a toolchain that transpiles dependencies (for example Next.js `transpilePackages` or `tsx`).
-Install it from npm, or use the pinned git dependency (`github:agentregistrar/spec#v2.0.0`). The
-package declares no `bin` entry — run the CLI with `pnpm validate:discovery`.
+subpaths (for example `@agentregistrar/discovery/agent-signup.schema.json`). Install the package from
+npm. Its version is in `package.json`; the installed CLI reports it with `--version`, and `--json`
+reports the same value as `validatorVersion`.
 
 ### Releasing the package
 
 Publishing is **tag-driven** and uses **npm trusted publishing (OIDC)** — no long-lived npm token.
-Bump `version` in `package.json`, add `release-notes-vX.Y.Z.md`, and merge to `main`. Then create and
-push an annotated tag on that merge commit:
+Bump `version` in `package.json`, add `release-notes-vX.Y.Z.md`, and merge to `main`. Before tagging,
+run `pnpm check:release`; it checks the package version, compiled `VALIDATOR_VERSION`, specification
+header, release notes, and the built CLI against `fixtures/valid-full.json`. Then create and push an
+annotated tag on that merge commit:
 
 ```bash
 git tag -a vX.Y.Z -m "agent-identity-protocol vX.Y.Z"
@@ -131,10 +150,15 @@ repository ruleset, which blocks updates and deletions of matching tags.
 
 ## Specification release
 
-Agent Identity Protocol **`v2.1.0`** renames the protocol from `agent-identity-v1` to the **Agent
-Identity Protocol** (`agent-identity-protocol`) and separates the wire version (`protocol_version:
-"2.0"` in discovery, `protocol_versions: ["2.0"]` in broker metadata, and `aud:
-"agent-identity-protocol"` in attestations). See the [v2.1.0 release
+The **`v2.1.1`** release is a package and documentation patch: it ships the compiled CLI `bin`, makes
+`package.json` the single source of the validator version, and fixes the `v2.1.0` documentation
+without a wire format, schema, fixture, or validator-behavior change. See the [v2.1.1 release
+notes](./release-notes-v2.1.1.md).
+
+The **`v2.1.0`** release renamed the protocol from `agent-identity-v1` to the **Agent Identity
+Protocol** (`agent-identity-protocol`) and separated the wire version, with `aud:
+"agent-identity-protocol"` in attestations, `protocol_version: "2.0"` in discovery, and
+`protocol_versions: ["2.0"]` in broker metadata. See the [v2.1.0 release
 notes](./release-notes-v2.1.0.md).
 
 `v2.0.0` introduced URL-hosted terms and keyless RP attestations:

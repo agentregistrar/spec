@@ -2,8 +2,8 @@
 
 - **Status:** Published.
 - **Machine-readable registry (canonical source):** [`implementations.json`](./implementations.json)
-- **Specification:** [`../agent-identity-protocol.md`](../agent-identity-protocol.md) — **v1.2.0**, released 2026-10-24 and tagged `v1.2.0` ([release notes](../release-notes-v1.2.0.md)). Earlier releases are `v1.1.0` (2026-10-18) and `v1.0.0` (2026-10-17).
-- **Conformance and attestation validator:** `src/validate-discovery.ts` — run as `pnpm validate:discovery <url-or-file> --json` ([validator guide](../validator.md)).
+- **Specification:** [`../agent-identity-protocol.md`](../agent-identity-protocol.md) - see §1.2 for the changelog and `release-notes-v*.md` for release notes. The wire contract is `protocol: "agent-identity-protocol"` with `protocol_version: "2.0"`.
+- **Conformance and attestation validator:** `npx @agentregistrar/discovery validate <url-or-file> --json` (from a clone: `pnpm validate:discovery <url-or-file> --json`) ([validator guide](../validator.md)).
 - **Registry validator and schema:** `src/validate-registry.ts` (`pnpm validate:registry [path] [--json]`) and [`implementations.schema.json`](./implementations.schema.json).
 - **Implementation guide:** [`../implementing-agent-identity-protocol.md`](../implementing-agent-identity-protocol.md).
 
@@ -20,9 +20,12 @@ errors**. Conformance means:
 
 - The document validates against the shared `AgentSignupDiscoverySchema` and the checked-in
   [`agent-signup.schema.json`](../agent-signup.schema.json).
-- Every required identity field is present and correct: `protocol`, `audience`, `provider_name`, a
-  non-empty `issuer_allowlist`, unique `required_scopes` (including `tos:accept`), `terms` with the
-  complete `text` + matching `sha256`, and `endpoints.agent_signup` as the only endpoint.
+- Every required identity field is present and correct: `protocol` exactly
+  `"agent-identity-protocol"`, `protocol_version` exactly `"2.0"`, `audience`, `provider_name`, a
+  non-empty `issuer_allowlist`, unique `required_scopes` (including `tos:accept`), URL-hosted `terms`
+  with `version` and an absolute HTTPS `url` (localhost development exception), and
+  `endpoints.agent_signup` as the only endpoint. `terms.text` and `terms.sha256` are not required and
+  are ignored if present.
 - The document contains **no vendor capability surface** at any depth — no catalogs, SKUs, pricing,
   provisioning/OTP endpoints, resource endpoints, or credentials (spec §5.3).
 
@@ -62,8 +65,9 @@ solvency, or conduct.
 
 ## 2. Entry criteria
 
-1. **The identity-only validator passes** — `pnpm validate:discovery <discovery-url> --json` reports
-   `valid: true` with `exitCode: 0` (warnings permitted, errors not).
+1. **The identity-only validator passes** - `npx @agentregistrar/discovery validate <discovery-url>
+   --json` (or `pnpm validate:discovery` from a clone) reports `valid: true` with `exitCode: 0`
+   (warnings permitted, errors not).
 2. **The discovery document is public and stable** — an HTTPS `/.well-known/agent-signup.json` on the implementation's canonical origin (spec §4), not a throwaway or per-deploy URL.
 3. **The contact is reachable** — a security/abuse/legal contact (email or URL) that someone actually monitors.
 4. **A post-signup context guide is published if the vendor has capabilities to document** — vendor features (catalog, provisioning, SKUs, API usage, errors) belong in that guide, not in discovery or this registry.
@@ -77,10 +81,10 @@ endorsement of the implementation's product, security posture, uptime, or pricin
 2026-10-26. The earlier `.example`/local-run exception is retired.
 
 **Live re-validation (2026-10-26).** The deployed reference implementation was validated with the
-v1.2.0 self-contained validator:
+conformance validator:
 
 ```bash
-pnpm validate:discovery https://skdl.dev/.well-known/agent-signup.json \
+npx @agentregistrar/discovery validate https://skdl.dev/.well-known/agent-signup.json \
   --verify-attestation --require-attestation \
   --trusted-rp-broker https://agentregistrar.dev --json
 ```
@@ -125,12 +129,13 @@ guide at `https://skdl.dev/docs/SKILL.md`, reached through the signed `context` 
    [implementation guide](../implementing-agent-identity-protocol.md).
 2. Run the validator against your **public** discovery URL and keep the JSON:
    ```bash
-   pnpm --silent validate:discovery https://your-service.example/.well-known/agent-signup.json --json
+   npx @agentregistrar/discovery validate https://your-service.example/.well-known/agent-signup.json --json
    ```
 3. Open a pull request that adds one object to the `implementations` array in
    [`implementations.json`](./implementations.json) with:
    `name`, `url`, `discovery_url`, `audience`, `protocol` (`agent-identity-protocol`),
-   `capabilities` (protocol capabilities only), `contact`, `validated_at`, `validator_version`, and a
+   `protocol_version` (`"2.0"`), `capabilities` (protocol capabilities only), `contact`,
+   `validated_at`, `validator_version`, and a
    `validator_evidence` object containing the exact command and the resulting counts
    (`protocol` and `audience` read directly from the `--json` output — see the
    [validator field reference](../validator.md#12---json-field-reference-for-the-implementation-registry)).
@@ -203,14 +208,12 @@ the `<…>` placeholders once hosting exists. In-repo, the link targets are
 
 | Artifact | Location |
 | :--- | :--- |
-| Specification (`v1.3.2`) | [`../agent-identity-protocol.md`](../agent-identity-protocol.md) |
+| Specification | [`../agent-identity-protocol.md`](../agent-identity-protocol.md) |
+| Changelog and release notes | [`../agent-identity-protocol.md`](../agent-identity-protocol.md) §1.2 (links to `release-notes-v*.md`) |
 | Scope boundaries rulebook | [`../scope-boundaries.md`](../scope-boundaries.md) |
 | Conformance + attestation validator guide | [`../validator.md`](../validator.md) |
 | Registry schema | [`./implementations.schema.json`](./implementations.schema.json) |
 | Implementation guide (new RPs) | [`../implementing-agent-identity-protocol.md`](../implementing-agent-identity-protocol.md) |
-| Release notes (`v1.2.0`) | [`../release-notes-v1.2.0.md`](../release-notes-v1.2.0.md) |
-| Release notes (`v1.1.0`) | [`../release-notes-v1.1.0.md`](../release-notes-v1.1.0.md) |
-| Release notes (`v1.0.0`) | [`../release-notes-v1.0.0.md`](../release-notes-v1.0.0.md) |
 | Machine-readable registry | [`./implementations.json`](./implementations.json) |
 
 This repository is the **canonical location** of the specification until a rendered copy is hosted
