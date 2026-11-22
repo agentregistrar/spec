@@ -40,8 +40,8 @@ import {
   PROTOCOL_VERSION,
   RECEIPT_JTI_PATTERN,
   UUID_PATTERN,
-} from "./constants";
-import { isHttpsCanonicalOrigin } from "./http";
+} from "./constants.js";
+import { isHttpsCanonicalOrigin } from "./http.js";
 
 /** Hostnames that may use plain `http://` as the documented development exception. */
 const DEV_LOCALHOST_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);

@@ -16,15 +16,15 @@ import {
   ATTESTATION_STATUS_TYP,
   CLOCK_SKEW_SECONDS,
   RECEIPT_TYP,
-} from "./constants";
-import { isRecord } from "./http";
-import { AttestationStatusClaimsVerifierSchema } from "./schema";
+} from "./constants.js";
+import { isRecord } from "./http.js";
+import { AttestationStatusClaimsVerifierSchema } from "./schema.js";
 import {
   loadIssuerJwks,
   parseCompactJws,
   verifyEd25519Jwk,
   type AttestationVerificationOptions,
-} from "./validate-attestation";
+} from "./validate-attestation.js";
 
 export interface ArtifactVerification {
   valid: boolean;

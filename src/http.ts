@@ -7,7 +7,7 @@
  * metadata fetches all go through {@link fetchResource}; nothing follows a URL
  * found inside a document body implicitly.
  */
-import { VALIDATOR_VERSION } from "./version";
+import { VALIDATOR_VERSION } from "./version.js";
 
 export const MAX_REDIRECTS = 3; // spec §4: at most three hops
 export const DEV_LOCALHOST_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);

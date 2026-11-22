@@ -38,22 +38,22 @@ import {
   isRecord,
   normalizeOrigin,
   parseAbsoluteHttpUrl,
-} from "./http";
-import { PROTOCOL_NAME, PROTOCOL_VERSION } from "./constants";
-import { loadRootSchema, validateJsonSchema, type SchemaError } from "./json-schema";
+} from "./http.js";
+import { PROTOCOL_NAME, PROTOCOL_VERSION } from "./constants.js";
+import { loadRootSchema, validateJsonSchema, type SchemaError } from "./json-schema.js";
 import {
   AgentSignupDiscoverySchema,
   AttestationSourceSchema,
   type AttestationMode,
-} from "./schema";
+} from "./schema.js";
 import {
   parseClockValue,
   verifyRpAttestation,
   verifyRpAttestationSource,
   type AttestationVerificationOptions,
   type AttestationVerificationResult,
-} from "./validate-attestation";
-import { VALIDATOR_ID, VALIDATOR_VERSION } from "./version";
+} from "./validate-attestation.js";
+import { VALIDATOR_ID, VALIDATOR_VERSION } from "./version.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_BYTES = 1024 * 1024; // spec §4: 1 MiB cap
@@ -301,6 +301,7 @@ function printHelp(): void {
     "Discovery Conformance Validator (Agent Identity Protocol)",
     "",
     "Usage:",
+    "  npx @agentregistrar/discovery validate <url-or-file> [options]",
     "  pnpm validate:discovery <url-or-file> [options]",
     "",
     "Modes:",
@@ -2404,10 +2405,10 @@ function printHuman(result: RunResult): void {
 // Entry point.
 // ---------------------------------------------------------------------------
 
-async function main(): Promise<void> {
+export async function runDiscoveryCli(argv: string[]): Promise<void> {
   let options: ParsedOptions;
   try {
-    options = parseArgs(process.argv.slice(2));
+    options = parseArgs(argv);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     console.error("Run `pnpm validate:discovery --help` for usage.");
@@ -2486,7 +2487,7 @@ const invokedDirectly =
   resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (invokedDirectly) {
-  main().catch((error: unknown) => {
+  runDiscoveryCli(process.argv.slice(2)).catch((error: unknown) => {
     console.error("Validator crashed:", error instanceof Error ? error.stack ?? error.message : error);
     process.exitCode = 2;
   });

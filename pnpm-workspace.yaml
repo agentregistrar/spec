@@ -1,4 +1,8 @@
 # pnpm settings for the @agentregistrar/discovery package.
+# pnpm requires a non-empty `packages` list when the workspace manifest is used
+# for settings; this is a single-package workspace.
+packages:
+  - "."
 # tsx runs on esbuild, whose install script must be approved to run.
 allowBuilds:
   esbuild: true

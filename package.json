@@ -5,11 +5,13 @@
   "license": "Apache-2.0",
   "private": false,
   "type": "module",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": "./dist/cli.js",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./agent-signup.schema.json": "./agent-signup.schema.json",
     "./attestation-source.schema.json": "./attestation-source.schema.json",
@@ -21,7 +23,7 @@
     "./registry/implementations.schema.json": "./registry/implementations.schema.json"
   },
   "files": [
-    "src",
+    "dist",
     "agent-signup.schema.json",
     "attestation-source.schema.json",
     "rp-attestation.schema.json",
@@ -29,7 +31,9 @@
     "attestation-status.schema.json",
     "signup-receipt.schema.json",
     "abuse-report.schema.json",
-    "registry/implementations.schema.json"
+    "registry/implementations.schema.json",
+    "LICENSE",
+    "README.md"
   ],
   "repository": {
     "type": "git",
@@ -48,6 +52,8 @@
     "access": "public"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json && node -e \"require('node:fs').chmodSync('dist/cli.js', 0o755)\"",
+    "check:release": "node scripts/check-release.mjs",
     "validate:discovery": "tsx src/validate-discovery.ts",
     "validate:fixtures": "tsx src/validate-fixtures.ts",
     "validate:registry": "tsx src/validate-registry.ts",

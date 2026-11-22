@@ -34,15 +34,15 @@ import {
   MAX_JWKS_CACHE_AGE_MS,
   MAX_METADATA_CACHE_AGE_MS,
   PROTOCOL_AUDIENCE,
-} from "./constants";
-import { fetchResource, isRecord, normalizeOrigin } from "./http";
+} from "./constants.js";
+import { fetchResource, isRecord, normalizeOrigin } from "./http.js";
 import {
   AttestationSourceDocumentSchema,
   BrokerMetadataSchema,
   parseRpAttestationVerifier,
   type AttestationMode,
   type RpAttestationClaims,
-} from "./schema";
+} from "./schema.js";
 
 /**
  * Statuses the validator itself can emit. `suspended` is the broker-managed

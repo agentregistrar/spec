@@ -23,31 +23,31 @@ import {
   COMPACT_JWS_PATTERN,
   KEY_ID_PATTERN,
   RP_KEY_PURPOSES,
-} from "./constants";
+} from "./constants.js";
 import {
   checkAgainstRootSchema,
   loadRootSchema,
   stripUnknownToSchema,
-} from "./json-schema";
+} from "./json-schema.js";
 import {
   BrokerMetadataSchema,
   AttestationStatusClaimsVerifierSchema,
   AttestationSourceDocumentSchema,
   RpAttestationClaimsSchema,
   RpAttestationClaimsVerifierSchema,
-} from "./schema";
+} from "./schema.js";
 import {
   parseClockValue,
   parseCompactJws,
   verifyRpAttestation,
   type AttestationVerificationOptions,
-} from "./validate-attestation";
+} from "./validate-attestation.js";
 import {
   validateDiscoveryInput,
   type DiscoveryRunResult,
   type InjectedAttestationSourceResponse,
-} from "./validate-discovery";
-import { verifyAbuseFixture, verifyReceiptFixture, verifyStatusFixture } from "./verify-artifacts";
+} from "./validate-discovery.js";
+import { verifyAbuseFixture, verifyReceiptFixture, verifyStatusFixture } from "./verify-artifacts.js";
 
 const ROOT = process.cwd();
 const DEFAULT_EXPECTED = "fixtures/expected.json";

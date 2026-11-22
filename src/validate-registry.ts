@@ -19,7 +19,7 @@
  */
 import { readFile } from "node:fs/promises";
 
-import { checkAgainstRootSchema, type SchemaError } from "./json-schema";
+import { checkAgainstRootSchema, type SchemaError } from "./json-schema.js";
 
 const DEFAULT_REGISTRY = "registry/implementations.json";
 const SCHEMA_FILE = "registry/implementations.schema.json";
