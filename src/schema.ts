@@ -41,7 +41,28 @@ import {
   RECEIPT_JTI_PATTERN,
   UUID_PATTERN,
 } from "./constants.js";
-import { isHttpsCanonicalOrigin } from "./http.js";
+/**
+ * Canonical HTTPS origin for a signed identity artifact (`iss`, `rp.origin`,
+ * broker metadata `issuer`): exact `url.origin` with `https:`, no path/query/
+ * fragment/wildcard/userinfo. Kept local so `schema.ts` has zero Node runtime
+ * imports and runs cleanly in Cloudflare Workers, Edge runtimes, and browsers.
+ */
+function isHttpsCanonicalOrigin(value: unknown): boolean {
+  if (typeof value !== "string" || value.length === 0 || value.includes("*")) {
+    return false;
+  }
+  const url = parseAbsoluteHttpUrl(value);
+  if (url === null || url.protocol !== "https:") {
+    return false;
+  }
+  if (url.pathname !== "/" && url.pathname !== "") {
+    return false;
+  }
+  if (url.search !== "" || url.hash !== "") {
+    return false;
+  }
+  return value === url.origin;
+}
 
 /** Hostnames that may use plain `http://` as the documented development exception. */
 const DEV_LOCALHOST_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);

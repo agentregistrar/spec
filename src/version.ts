@@ -13,11 +13,5 @@
  * metadata `protocol_versions: ["2.0"]`, and attestation
  * `aud: "agent-identity-protocol"`).
  */
-import { readFileSync } from "node:fs";
-
-const pkg = JSON.parse(
-  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
-) as { version: string };
-
 export const VALIDATOR_ID = "agent-identity-protocol";
-export const VALIDATOR_VERSION: string = pkg.version;
+export const VALIDATOR_VERSION = "2.2.1";

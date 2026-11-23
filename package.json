@@ -1,6 +1,6 @@
 {
   "name": "@agentregistrar/discovery",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Agent Identity Protocol (agent-identity-protocol) discovery, attestation source, RP attestation, broker metadata and attestation-status schemas, plus the conformance and attestation-source validator",
   "license": "Apache-2.0",
   "private": false,

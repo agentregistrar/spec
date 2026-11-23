@@ -1,10 +1,10 @@
 # Agent Identity Protocol — Relying Party Discovery (`agent-signup.json`)
 
-- **Status:** Normative specification — v2.2.0. Maintained in [`agentregistrar/spec`](https://github.com/agentregistrar/spec).
+- **Status:** Normative specification — v2.2.1. Maintained in [`agentregistrar/spec`](https://github.com/agentregistrar/spec).
 - **Protocol identifier:** `agent-identity-protocol`
 - **Protocol version:** `2.0`
 - **Well-known URI:** `GET /.well-known/agent-signup.json`
-- **Specification release:** v2.2.0 (see §1.3)
+- **Specification release:** v2.2.1 (see §1.3)
 - **Companion document:** [`scope-boundaries.md`](./scope-boundaries.md) — the identity-vs-vendor boundary and the future-change review checklist.
 
 This document is the single normative definition of the `agent-signup.json` discovery contract and the
