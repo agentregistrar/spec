@@ -210,9 +210,10 @@ const iso8601Timestamp = z
  * Identity-only v1 discovery document served at `/.well-known/agent-signup.json`.
  *
  * Required: `protocol`, `audience`, `provider_name`, `issuer_allowlist`,
- * `required_scopes`, `terms` (`version`/`url`), and `endpoints.agent_signup` —
- * the only endpoint. The broker fetches the URL-hosted terms document at signup
- * time and hashes the exact response bytes for the assertion and ToS ledger.
+ * `required_scopes`, `terms` (`version`/`url`), and `endpoints.agent_signup`
+ * (`endpoints.agent_login` is optional in v2.2.0 for Day-2 re-authentication).
+ * The broker fetches the URL-hosted terms document at signup time and hashes
+ * the exact response bytes for the assertion and ToS ledger.
  *
  * The removed vendor fields (`instance_catalog`, `endpoints.provision`,
  * `endpoints.email_signup`, `endpoints.verify_otp`, and
@@ -264,11 +265,13 @@ export const AgentSignupDiscoverySchema = z
       })
       .passthrough(),
 
-    // `agent_signup` is the only v1 endpoint. The removed vendor endpoints are
-    // forbidden and rejected; unknown additive endpoints are preserved.
+    // `agent_signup` is required; `agent_login` is optional (v2.2.0 Day-2
+    // re-authentication). Removed vendor endpoints are forbidden and rejected;
+    // unknown additive endpoints are preserved.
     endpoints: z
       .object({
         agent_signup: absoluteProtocolUrl,
+        agent_login: absoluteProtocolUrl.optional(),
 
         // Forbidden vendor endpoints (removed from v1).
         provision: z.never().optional(),
@@ -660,3 +663,173 @@ export type AttestationStatusResponse = z.infer<typeof AttestationStatusResponse
 export const ReceiptJtiPattern = RECEIPT_JTI_PATTERN;
 export const AbuseJtiPattern = ABUSE_JTI_PATTERN;
 export const AbuseReportLifetimeSeconds = ABUSE_REPORT_LIFETIME_SECONDS;
+
+// ===========================================================================
+// Provider-to-agent Day-2 response conventions (v2.2.0; spec §7.4–§7.5)
+// ===========================================================================
+//
+// Strictly separate from discovery (`AgentSignupDiscoverySchema`) and signed
+// receipts (`signup-receipt.schema.json`). These describe optional provider HTTP
+// response payloads returned directly to the agent (`handoff`,
+// `human_action_required`, `terms_reacceptance_required`) and are never sent to
+// or stored by the broker.
+
+/**
+ * Strict protocol URL for Day-2 provider-to-agent response fields: `https://`
+ * everywhere with the documented `http://localhost` / `http://127.0.0.1`
+ * development exception, and no whitespace or userinfo.
+ */
+function isStrictProtocolUrl(value: string): boolean {
+  if (/\s/.test(value)) {
+    return false;
+  }
+  const url = parseAbsoluteHttpUrl(value);
+  if (url === null) {
+    return false;
+  }
+  if (url.username !== "" || url.password !== "") {
+    return false;
+  }
+  return url.protocol === "https:" || isDevelopmentOrigin(url);
+}
+
+const strictProtocolUrl = z
+  .string()
+  .min(1)
+  .refine(isStrictProtocolUrl, {
+    message:
+      "must be an absolute HTTPS URL with no userinfo or whitespace (http://localhost / http://127.0.0.1 is the development exception)",
+  });
+
+/** Credential type enum for `handoff.session` (spec §7.5). */
+export const AgentHandoffCredentialTypeSchema = z.enum([
+  "bearer_token",
+  "api_key",
+  "oauth_token",
+]);
+export type AgentHandoffCredentialType = z.infer<typeof AgentHandoffCredentialTypeSchema>;
+
+/** CLI auth mode enum for `handoff.cli` (spec §7.5). */
+export const AgentHandoffCliAuthModeSchema = z.enum([
+  "env_var",
+  "bearer_token",
+  "agent_login",
+  "oauth",
+]);
+export type AgentHandoffCliAuthMode = z.infer<typeof AgentHandoffCliAuthModeSchema>;
+
+/** Provider-minted per-session credential handoff (strict; never sent to broker). */
+export const AgentHandoffSessionSchema = z
+  .object({
+    credential_type: AgentHandoffCredentialTypeSchema,
+    access_token: z.string().min(1),
+    token_type: z.string().min(1).optional(),
+    expires_in: z.number().int().positive().optional(),
+    refresh_token: z.string().min(1).optional(),
+    scopes: z.array(z.string().min(1)).optional(),
+    session_id: z.string().min(1).optional(),
+  })
+  .strict();
+export type AgentHandoffSession = z.infer<typeof AgentHandoffSessionSchema>;
+
+/** First-party MCP server pointer in `handoff.mcp` (strict). */
+export const AgentHandoffMcpSchema = z
+  .object({
+    url: strictProtocolUrl,
+    transport: z.string().min(1).optional(),
+    auth: z.string().min(1).optional(),
+  })
+  .strict();
+export type AgentHandoffMcp = z.infer<typeof AgentHandoffMcpSchema>;
+
+/** Declarative CLI bootstrap metadata in `handoff.cli` (strict; no executable shell strings). */
+export const AgentHandoffCliSchema = z
+  .object({
+    name: z
+      .string()
+      .min(1)
+      .regex(
+        /^[A-Za-z0-9._/@-]+$/,
+        "cli.name must be a declarative package or binary name without whitespace or shell metacharacters",
+      ),
+    env_var: z
+      .string()
+      .regex(
+        /^[A-Za-z_][A-Za-z0-9_]*$/,
+        "cli.env_var must be a valid environment variable identifier",
+      )
+      .optional(),
+    auth_mode: AgentHandoffCliAuthModeSchema,
+    docs_url: strictProtocolUrl.optional(),
+  })
+  .strict();
+export type AgentHandoffCli = z.infer<typeof AgentHandoffCliSchema>;
+
+/** Human-facing dashboard, claim, and billing URLs in `handoff.human_urls` (strict). */
+export const AgentHandoffHumanUrlsSchema = z
+  .object({
+    dashboard_url: strictProtocolUrl.optional(),
+    claim_url: strictProtocolUrl.optional(),
+    billing_url: strictProtocolUrl.optional(),
+  })
+  .strict();
+export type AgentHandoffHumanUrls = z.infer<typeof AgentHandoffHumanUrlsSchema>;
+
+/**
+ * Optional provider-to-agent `handoff` object returned on `201` signup or `200`
+ * login responses (v2.2.0; spec §7.5). Closed at the root and every sub-object
+ * so executable shell command fields (`command`, `install_script`, etc.) cannot
+ * be smuggled in. Never placed in discovery or Contract E receipts, and never
+ * sent to or stored by the broker.
+ */
+export const AgentHandoffSchema = z
+  .object({
+    session: AgentHandoffSessionSchema.optional(),
+    mcp: AgentHandoffMcpSchema.optional(),
+    cli: AgentHandoffCliSchema.optional(),
+    human_urls: AgentHandoffHumanUrlsSchema.optional(),
+  })
+  .strict();
+export type AgentHandoff = z.infer<typeof AgentHandoffSchema>;
+
+/** Reason codes for `human_action_required` (spec §7.5). */
+export const HumanActionRequiredReasonSchema = z.enum([
+  "account_link_required",
+  "agent_link_required",
+  "step_up_required",
+  "billing_required",
+]);
+export type HumanActionRequiredReason = z.infer<typeof HumanActionRequiredReasonSchema>;
+
+/**
+ * Provider `human_action_required` response (`202 Accepted` or `403 Forbidden`)
+ * for account linking, multi-agent step-up, high-privilege re-login, or billing
+ * gates (v2.2.0; spec §7.5).
+ */
+export const HumanActionRequiredSchema = z
+  .object({
+    error: z.literal("human_action_required"),
+    reason: HumanActionRequiredReasonSchema,
+    verification_url: strictProtocolUrl,
+    user_code: z.string().min(1).optional(),
+    expires_in: z.number().int().positive().optional(),
+    retry_after_seconds: z.number().int().positive().optional(),
+    error_description: z.string().min(1).optional(),
+  })
+  .passthrough();
+export type HumanActionRequired = z.infer<typeof HumanActionRequiredSchema>;
+
+/**
+ * Provider `terms_reacceptance_required` error (`403 Forbidden` or `409 Conflict`)
+ * returned on `agent_login` or vendor API calls when terms have updated
+ * (v2.2.0; spec §7.5).
+ */
+export const TermsReacceptanceRequiredSchema = z
+  .object({
+    error: z.literal("terms_reacceptance_required"),
+    expected_terms_version: z.string().min(1),
+    terms_url: strictProtocolUrl,
+    error_description: z.string().min(1).optional(),
+  })
+  .passthrough();
+export type TermsReacceptanceRequired = z.infer<typeof TermsReacceptanceRequiredSchema>;

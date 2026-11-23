@@ -111,13 +111,17 @@
       }
     },
     "endpoints": {
-      "description": "Signup endpoints. `agent_signup` is the only v1 endpoint; removed vendor endpoints are rejected.",
+      "description": "Agent authentication endpoints. `agent_signup` is required; `agent_login` is optional for Day-2 re-authentication. Removed vendor endpoints are rejected.",
       "type": "object",
       "required": ["agent_signup"],
       "additionalProperties": true,
       "properties": {
         "agent_signup": {
           "description": "Absolute URL accepting POST with `Authorization: Bearer <assertion>`.",
+          "$ref": "#/$defs/absoluteProtocolUrl"
+        },
+        "agent_login": {
+          "description": "Optional Day-2 agent re-login URL accepting POST with `Authorization: Bearer <login-assertion>`.",
           "$ref": "#/$defs/absoluteProtocolUrl"
         },
         "provision": false,

@@ -60,6 +60,52 @@
       }
     },
     {
+      "id": "discovery/valid-with-agent-login",
+      "kind": "discovery",
+      "path": "fixtures/valid-with-agent-login.json",
+      "options": {
+        "verifyAttestation": false
+      },
+      "expect": {
+        "exitCode": 0,
+        "status": "unverified",
+        "reason": "absent",
+        "conformance": true,
+        "evaluated": true,
+        "verified": false,
+        "checks": {
+          "field.endpoints.agent_signup": "pass",
+          "field.endpoints.agent_login": "pass",
+          "warn.unknown-endpoint-fields": "pass",
+          "schema.zod": "pass",
+          "schema.json-schema": "pass"
+        }
+      }
+    },
+    {
+      "id": "discovery/invalid-agent-login-http",
+      "kind": "discovery",
+      "path": "fixtures/invalid-agent-login-http.json",
+      "options": {
+        "verifyAttestation": false
+      },
+      "expect": {
+        "exitCode": 1,
+        "status": "unverified",
+        "reason": "absent",
+        "conformance": false,
+        "evaluated": true,
+        "verified": false,
+        "failCheck": "field.endpoints.agent_login",
+        "checks": {
+          "field.endpoints.agent_login": "fail",
+          "field.endpoints.agent_signup": "pass",
+          "schema.zod": "fail",
+          "schema.json-schema": "pass"
+        }
+      }
+    },
+    {
       "id": "discovery/valid-minimal--verify-absent",
       "kind": "discovery",
       "path": "fixtures/valid-minimal.json",

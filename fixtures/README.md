@@ -93,6 +93,8 @@ for a rule JSON Schema cannot express (currently: unique `keys[].kid`).
 | Fixture | Expected |
 | :--- | :--- |
 | `valid-minimal.json`, `valid-full.json`, `valid-localhost.json` | conformant, no `attestation`, `unverified`, exit `0`; `terms` carries only `version` and `url` (URL-hosted terms) |
+| `valid-with-agent-login.json` | conformant, optional `endpoints.agent_login` present with HTTPS URL, `unverified`, exit `0` |
+| `invalid-agent-login-http.json` | conformance failure, exit `1`, `field.endpoints.agent_login` (non-HTTPS `agent_login` outside localhost exception) |
 | `valid-attestation-broker.json` | broker mode: `verified`, mode `broker`, level `domain`, exit `0` (offline source response, trusted broker, `--at 2026-10-24T00:00:00Z`) |
 | `valid-attestation-broker.json` with a keyless source | `verified`, mode `broker`, level `domain`, exit `0`; `keys: []` is a valid attestation |
 | `valid-attestation-provider.json` | provider mode on the discovery origin: `verified`, mode `provider`, exit `0` |

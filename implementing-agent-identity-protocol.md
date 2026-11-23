@@ -45,11 +45,11 @@ Required fields (`agent-identity-protocol.md` §5.1): `protocol` (`"agent-identi
 `required_scopes` (including `tos:accept`), `terms` (`version` + the URL of your own hosted terms
 document), and `endpoints.agent_signup`.
 
-Optional fields (§5.2): `spec`, `provider_url`, `contact`, `updated_at`, non-capability `extensions`
-keyed by reverse-DNS namespace, and the optional `attestation` source object (§10 of this guide).
-Nothing else. See the minimal example in §5.5 of the spec; do not copy vendor fields from older docs.
-The embedded `rp_attestation` field from `v1.2.0` is **removed**: a document that still contains it is
-non-conformant, and there is no compatibility field.
+Optional fields (§5.2): `endpoints.agent_login` (optional Day-2 re-login endpoint), `spec`, `provider_url`,
+`contact`, `updated_at`, non-capability `extensions` keyed by reverse-DNS namespace, and the optional
+`attestation` source object (§10 of this guide). Nothing else. See the minimal example in §5.5 of the
+spec; do not copy vendor fields from older docs. The embedded `rp_attestation` field from `v1.2.0` is
+**removed**: a document that still contains it is non-conformant, and there is no compatibility field.
 
 ### Forbidden fields (§5.3)
 
@@ -103,6 +103,20 @@ assertion is Contract A (Ed25519 JWT); you only verify it here. Enforce at minim
 
 Record the assertion `jti`, the accepted ToS version/hash, and attribution for audit. Revocation is
 enforced by the Broker at minting time; you do not need a revocation feed for v1.
+
+If you implement optional `endpoints.agent_login` (`v2.2.0`), also follow `agent-identity-protocol.md`
+§7.0 and §7.4–§7.5:
+
+- Require `purpose === "login"` on `agent_login` (and reject `purpose === "login"` on `agent_signup`),
+  and reject replayed `jti` values within the assertion lifetime.
+- Follow the normative anti-ATO resolution order: resolve `(iss, sub)` first (checking termination and
+  terms freshness via `delegation.accepted_rp_tos_version` / `terms.url`, returning
+  `terms_reacceptance_required` when stale), then `(iss, human.id)` on broker-created accounts, and
+  **never** auto-link or grant access to a pre-existing human-registered account by `human.email` alone
+  (return `human_action_required` with `reason: "account_link_required"`).
+- Mint a new per-session, revocable first-party credential without invalidating other active devices'
+  sessions, and optionally return the provider-to-agent `handoff` object (`session`, `mcp`, `cli`,
+  `human_urls` — HTTPS URLs only, zero executable shell strings).
 
 ---
 

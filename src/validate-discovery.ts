@@ -96,6 +96,7 @@ interface DocumentMetadata {
   audience: string | null;
   providerName: string | null;
   signupEndpoint: string | null;
+  loginEndpoint: string | null;
   terms: { version: string | null; url: string | null } | null;
 }
 
@@ -313,7 +314,8 @@ function printHelp(): void {
     "  --probe-jwks        opt-in: fetch GET <issuer>/.well-known/jwks.json for each",
     "                      issuer and require >=1 usable verification key",
     "  --probe-endpoints   opt-in: non-destructively HEAD/OPTIONS the advertised",
-    "                      agent_signup endpoint (never POST / never signup)",
+    "                      agent_signup (and optional agent_login) endpoint(s)",
+    "                      (never POST / never signup/login)",
     "  --verify-attestation",
     "                      fetch and verify the source named by `attestation.uri`",
     "                      (opt-in). Absent `attestation` = unverified. Typed",
@@ -674,6 +676,25 @@ function checkAgentSignup(document: Record<string, unknown>): Check {
     "endpoints.agent_signup",
     `endpoints.agent_signup is an absolute URL (${String(value)})`,
   );
+}
+
+function checkAgentLogin(document: Record<string, unknown>): Check {
+  const id = "field.endpoints.agent_login";
+  const title = "endpoints.agent_login";
+  const endpoints = document.endpoints;
+  if (!isRecord(endpoints) || !("agent_login" in endpoints)) {
+    return skip(id, title, "no agent_login endpoint (OPTIONAL; absence is conformant)");
+  }
+  const value = endpoints.agent_login;
+  if (!isAbsoluteProtocolUrl(value)) {
+    return fail(
+      id,
+      title,
+      "endpoints.agent_login must be an absolute protocol URL (https, localhost dev exception)",
+      { actual: JSON.stringify(value ?? null) },
+    );
+  }
+  return ok(id, title, `endpoints.agent_login is an absolute URL (${String(value)})`);
 }
 
 /**
@@ -1463,7 +1484,7 @@ function checkUnknownEndpoints(document: Record<string, unknown>, forbiddenEndpo
     return skip("warn.unknown-endpoint-fields", "unknown endpoint fields", "no endpoints object present");
   }
   const unknown = Object.keys(endpoints).filter(
-    (key) => key !== "agent_signup" && !forbiddenEndpoints.has(key),
+    (key) => key !== "agent_signup" && key !== "agent_login" && !forbiddenEndpoints.has(key),
   );
   if (unknown.length === 0) {
     return ok(
@@ -1490,6 +1511,8 @@ function buildMetadata(document: Record<string, unknown>): DocumentMetadata {
     providerName: typeof document.provider_name === "string" ? document.provider_name : null,
     signupEndpoint:
       endpoints && typeof endpoints.agent_signup === "string" ? endpoints.agent_signup : null,
+    loginEndpoint:
+      endpoints && typeof endpoints.agent_login === "string" ? endpoints.agent_login : null,
     terms: terms
       ? {
           version: typeof terms.version === "string" ? terms.version : null,
@@ -1604,6 +1627,7 @@ async function checkDocument(
   addCheck(checks, checkRequiredScopes(document));
   addCheck(checks, checkTerms(document));
   addCheck(checks, checkAgentSignup(document));
+  addCheck(checks, checkAgentLogin(document));
 
   const findings: ForbiddenFinding[] = [];
   scanForbidden(document, "$", findings);
@@ -1646,6 +1670,9 @@ async function checkDocument(
     const endpoints = document.endpoints;
     if (isRecord(endpoints) && typeof endpoints.agent_signup === "string") {
       probes.push(await probeEndpoint(endpoints.agent_signup, options, inputOrigin));
+    }
+    if (isRecord(endpoints) && typeof endpoints.agent_login === "string") {
+      probes.push(await probeEndpoint(endpoints.agent_login, options, inputOrigin));
     }
   }
 
@@ -2285,6 +2312,7 @@ function toJson(result: RunResult): Record<string, unknown> {
     audience: result.metadata?.audience ?? null,
     providerName: result.metadata?.providerName ?? null,
     signupEndpoint: result.metadata?.signupEndpoint ?? null,
+    loginEndpoint: result.metadata?.loginEndpoint ?? null,
     terms: result.metadata?.terms ?? null,
     fetchFailure: result.fetchFailure,
     counts: {

@@ -19,6 +19,7 @@ vendor catalog, provisioning, or resource surface in the protocol.
 | [`scope-boundaries.md`](./scope-boundaries.md) | Identity-vs-vendor scope rulebook, including RP identity, and the future-change checklist. |
 | [`implementing-agent-identity-protocol.md`](./implementing-agent-identity-protocol.md) | Relying Party implementation guide (provider identity, attestation modes, receipts, abuse). |
 | [`validator.md`](./validator.md) | Conformance, attestation, fixture, and registry validator guide. |
+| [`release-notes-v2.2.0.md`](./release-notes-v2.2.0.md) | Release notes for the `v2.2.0` Day-2 re-login, credential handoff, and terms re-attestation release. |
 | [`release-notes-v2.1.1.md`](./release-notes-v2.1.1.md) | Release notes for the `v2.1.1` compiled package, CLI `bin`, and documentation patch. |
 | [`release-notes-v2.1.0.md`](./release-notes-v2.1.0.md) | Release notes for the `v2.1.0` Agent Identity Protocol rename and `protocol_version: "2.0"` split. |
 | [`release-notes-v2.0.0.md`](./release-notes-v2.0.0.md) | Release notes for the `v2.0.0` URL-terms and keyless-attestation release. |
@@ -106,8 +107,10 @@ no private dependencies and ships compiled JavaScript in `dist/`:
   `AttestationSourceSchema`, `AttestationSourceDocumentSchema`, `RpAttestationClaimsSchema`,
   `RpAttestationKeySchema`, `RpAttestationHeaderSchema`, `AttestationStatusValueSchema`,
   `AttestationStatusClaimsSchema`, `AttestationStatusClaimsVerifierSchema`,
-  `AttestationStatusResponseSchema`, `BrokerMetadataSchema`, plus the producer/verifier parsers
-  `parseRpAttestationProducer`, `parseRpAttestationVerifier`, `parseAttestationSourceDocument`, and
+  `AttestationStatusResponseSchema`, `BrokerMetadataSchema`, plus the optional `v2.2.0`
+  provider-to-agent Day-2 response schemas (`AgentHandoffSchema`, `HumanActionRequiredSchema`,
+  `TermsReacceptanceRequiredSchema`), and the producer/verifier parsers `parseRpAttestationProducer`,
+  `parseRpAttestationVerifier`, `parseAttestationSourceDocument`, and
   `parseAttestationStatusVerifier`. `src/index.ts` re-exports them.
 - `src/validate-discovery.ts` — the conformance + attestation validator CLI (`pnpm validate:discovery`).
 - `dist/cli.js` - the published `bin`; `npx @agentregistrar/discovery validate <url-or-file>` (or a
@@ -149,6 +152,13 @@ accepted the version. The `v*` namespace is protected by the **Protect released 
 repository ruleset, which blocks updates and deletions of matching tags.
 
 ## Specification release
+
+The **`v2.2.0`** release is a strictly additive Day-2 lifecycle revision within `protocol_version: "2.0"`:
+it adds optional `endpoints.agent_login` to discovery, Contract A additive `purpose` (`"signup" | "login"`)
+and `delegation.accepted_rp_tos_version`, the `POST endpoints.agent_login` handshake and anti-ATO account
+resolution rules, and the optional provider-to-agent Day-2 Zod schemas (`AgentHandoffSchema`,
+`HumanActionRequiredSchema`, `TermsReacceptanceRequiredSchema`). Existing `v2.0`/`v2.1` providers remain
+100% conformant. See the [v2.2.0 release notes](./release-notes-v2.2.0.md).
 
 The **`v2.1.1`** release is a package and documentation patch: it ships the compiled CLI `bin`, makes
 `package.json` the single source of the validator version, and fixes the `v2.1.0` documentation
