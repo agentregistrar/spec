@@ -118,7 +118,7 @@ object; the identity and the signed statement are unchanged.
 - the broker-issued RP attestation and its publication through the optional `attestation` source
   object (`mode` `broker` or `provider`, stable source URI);
 - the provider API that issues and renews attestations (Contract H) and the broker metadata that
-  advertises JWKS/status/abuse endpoints (Contract I);
+  advertises JWKS/status/abuse/signup-receipt endpoints (Contract I);
 - RP-signed receipts and authenticated receipt ingestion;
 - the RP abuse-report signature and the human-visible trust/distrust policy.
 

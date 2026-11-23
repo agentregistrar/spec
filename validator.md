@@ -379,8 +379,11 @@ warnings only, so producers can evolve additively without silently losing visibi
 - A source fetch never follows a cross-origin redirect, and the source body or a token from it is never
   echoed into an error message.
 - For a trusted issuer without `--jwks`, broker metadata is fetched from that issuer's
-  `/.well-known/agent-broker.json`; only a validated, same-origin HTTPS `jwks_uri` is followed,
-  otherwise the fixed `/.well-known/jwks.json` fallback is used.
+  `/.well-known/agent-broker.json` and validated against `BrokerMetadataSchema` (six required fields
+  plus optional `signup_receipt_endpoint` in `v2.3.0`, `additionalProperties: false`); only a
+  validated, same-origin HTTPS `jwks_uri` is followed, otherwise the fixed `/.well-known/jwks.json`
+  fallback is used. Cross-origin `attestation_status_uri`, `abuse_endpoint`, and
+  `signup_receipt_endpoint` are permitted under standard SSRF rules (same-origin recommended).
 - `terms.url` and all document content are treated as data and are never executed or interpreted.
   The validator does not fetch `terms.url`.
 - Every fetch applies the timeout, the 1 MiB read cap, and the three-hop same-origin redirect limit.
@@ -400,8 +403,10 @@ Reads the expected result for every standalone fixture from `fixtures/expected.j
 same code as the CLI, and exits `0` (all rows match) or `1` (a row differs). It covers the discovery
 matrix (including the `attestation` modes, host binding, the removed field, and typed broker
 403/404/410/503 rows), every attestation JWS (status plus producer/verifier schema mode, including the
-keyless `keys: []` row), source documents, receipts, abuse reports, status responses, broker metadata,
-and provider request/response examples. See [`fixtures/README.md`](./fixtures/README.md).
+keyless `keys: []` row), source documents, receipts, abuse reports, status responses, broker metadata
+(including optional `signup_receipt_endpoint` present, omitted, cross-origin, non-HTTPS, userinfo,
+and unknown-property rejection), and provider request/response examples. See
+[`fixtures/README.md`](./fixtures/README.md).
 
 ### `pnpm validate:registry [path] [--json]`
 

@@ -1,10 +1,10 @@
 # Agent Identity Protocol — Relying Party Discovery (`agent-signup.json`)
 
-- **Status:** Normative specification — v2.2.1. Maintained in [`agentregistrar/spec`](https://github.com/agentregistrar/spec).
+- **Status:** Normative specification — v2.3.0. Maintained in [`agentregistrar/spec`](https://github.com/agentregistrar/spec).
 - **Protocol identifier:** `agent-identity-protocol`
 - **Protocol version:** `2.0`
 - **Well-known URI:** `GET /.well-known/agent-signup.json`
-- **Specification release:** v2.2.1 (see §1.3)
+- **Specification release:** v2.3.0 (see §1.3)
 - **Companion document:** [`scope-boundaries.md`](./scope-boundaries.md) — the identity-vs-vendor boundary and the future-change review checklist.
 
 This document is the single normative definition of the `agent-signup.json` discovery contract and the
@@ -42,6 +42,8 @@ scope.
 
 | Version | Date | Change |
 | :--- | :--- | :--- |
+| `v2.3.0` | 2026-11-23 | **Discoverable signup receipt endpoint & async Contract F delivery profile (strictly additive).** Adds optional `signup_receipt_endpoint` to Contract I broker metadata (`/.well-known/agent-broker.json`, `broker-metadata.schema.json`, `BrokerMetadataSchema`; `additionalProperties: false` remains enforced with the 7th optional field; cross-origin permitted under standard SSRF rules, same-origin recommended) and documents the recommended asynchronous outbox delivery pattern and explicit HTTP retryability matrix for Contract F (§11.6). Reaffirms that signed receipts remain optional and keyless providers remain 100% conformant for base signup. Wire `protocol_version: "2.0"` is unchanged. See [`release-notes-v2.3.0.md`](./release-notes-v2.3.0.md). |
+| `v2.2.1` | 2026-11-23 | **Edge/Workers runtime compatibility patch.** Removes `node:fs` and `node:*` imports from the root schema export graph (`src/schema.ts`, `src/version.ts`) so `@agentregistrar/discovery` runs cleanly in Cloudflare Workers, Edge runtimes, and browsers. No wire format, schema, fixture, or validator-behavior changes. See [`release-notes-v2.2.1.md`](./release-notes-v2.2.1.md). |
 | `v2.2.0` | 2026-11-23 | **Day-2 re-login, credential handoff, and terms re-attestation (strictly additive).** Adds optional `endpoints.agent_login` to discovery (`protocol` stays `"agent-identity-protocol"` and `protocol_version` stays `"2.0"`), Contract A additive `purpose` (`"signup" \| "login"`) and `delegation.accepted_rp_tos_version`, the `POST endpoints.agent_login` handshake and anti-ATO account resolution rules, and optional provider-to-agent response contracts (`handoff` with strict no-shell-command and never-send-to-broker rules, `human_action_required`, and `terms_reacceptance_required`). Existing `v2.0`/`v2.1` providers remain 100% conformant. See [`release-notes-v2.2.0.md`](./release-notes-v2.2.0.md). |
 | `v2.1.1` | 2026-11-22 | **Package and documentation patch.** Ships the compiled JS package with an `npx @agentregistrar/discovery` CLI `bin` (`validate <url-or-file>`, a direct target, and `--version`), derives `VALIDATOR_VERSION` from `package.json`, adds the `pnpm check:release` consistency gate, and fixes the `v2.1.0` documentation errata. No wire format, schema, fixture, or validator-behavior changes. See [`release-notes-v2.1.1.md`](./release-notes-v2.1.1.md). |
 | `v2.1.0` | 2026-11-21 | **Protocol rename and version split.** Renames the protocol from `agent-identity-v1` to the Agent Identity Protocol (`protocol: "agent-identity-protocol"`, with `aud: "agent-identity-protocol"` in attestations) and separates the protocol name from the wire version (`protocol_version: "2.0"` in discovery and `protocol_versions: ["2.0"]` in broker metadata). Adds the `field.protocol_version` conformance check. The signup handshake and assertion format are unchanged. See [`release-notes-v2.1.0.md`](./release-notes-v2.1.0.md). |
@@ -161,12 +163,27 @@ and `signup-receipt.schema.json` strictly separate. Existing `v2.0`/`v2.1` disco
 without `endpoints.agent_login` remain 100% conformant. See
 [`release-notes-v2.2.0.md`](./release-notes-v2.2.0.md).
 
+**Release record (`v2.2.1`).** `v2.2.1` is the **2026-11-23** Edge/Workers runtime compatibility
+patch. It removes `node:*` imports from `src/schema.ts` and `src/version.ts` so the compiled package
+root runs cleanly in Cloudflare Workers, Edge runtimes, and browsers without changing any wire
+format, schema, fixture, or validator behavior. See
+[`release-notes-v2.2.1.md`](./release-notes-v2.2.1.md).
+
+**Release record (`v2.3.0`).** `v2.3.0` is the **2026-11-23** strictly additive minor release under
+`protocol_version: "2.0"`. It adds optional `signup_receipt_endpoint` to Contract I broker metadata
+(`/.well-known/agent-broker.json`, `broker-metadata.schema.json`, and `BrokerMetadataSchema`) so
+relying parties can discover a broker's Contract F receipt ingestion URL instead of hardcoding a
+path, while keeping the six required fields and `additionalProperties: false` intact. It also
+documents the recommended asynchronous outbox delivery pattern and explicit HTTP retryability matrix
+for Contract F (§11.6) and reaffirms that signed receipts remain optional and keyless providers stay
+100% conformant for base signup. See [`release-notes-v2.3.0.md`](./release-notes-v2.3.0.md).
+
 ### 1.3 Version identity
 
 - `protocol` carries the stable protocol name: `"agent-identity-protocol"`. `protocol_version`
   carries the wire version: `"2.0"`. Discovery requires both fields (§5.1); `protocol` is not a
   version.
-- Specification and package releases follow semantic versioning (`v2.2.0`; see `package.json`, the
+- Specification and package releases follow semantic versioning (`v2.3.0`; see `package.json`, the
   changelog above, and `release-notes-*.md`). A breaking wire change requires a new
   `protocol_version` value and a new discovery path (§13).
 - `v2.1.0` renamed the protocol from `agent-identity-v1` to the Agent Identity Protocol and separated
@@ -1043,7 +1060,10 @@ attestation.
 
 ### 11.6 Contract F — authenticated receipt ingestion
 
-`POST /api/broker/signup-receipt` accepts:
+RPs discover the broker's Contract F endpoint from `signup_receipt_endpoint` in the broker's
+Contract I metadata (`GET <issuer>/.well-known/agent-broker.json`, §16.1). When broker metadata is
+absent or omits `signup_receipt_endpoint`, RPs fall back to `POST <issuer>/api/broker/signup-receipt`.
+`POST <signup_receipt_endpoint>` accepts:
 
 ```json
 { "signup_token": "<compact Contract E receipt JWS>", "rp_attestation": "<compact JWS>" }
@@ -1106,6 +1126,40 @@ a retired attestation-signing public key in its JWKS for at least 30 days after 
 signed with that key expires, so a receipt presented after expiry and after a broker-key rotation can
 still be verified (§16). After that window, an unseen old receipt is `attestation_unavailable` rather
 than silently trusted.
+
+#### Asynchronous delivery pattern & retryability (`v2.3.0`)
+
+Signed receipts remain strictly RP-signed (Contract E / F) and **OPTIONAL** for base conformance: a
+keyless RP (no registered RP signing key, `keys: []`, or unverified) remains 100% conformant for
+brokered signup.
+
+RPs that issue signed receipts **SHOULD** deliver them asynchronously out-of-band rather than
+blocking `POST endpoints.agent_signup` on the broker callback:
+
+1. Persist the provider account idempotently.
+2. Sign the Contract E receipt using the active RP key in the current attestation and capture that
+   exact `rp_attestation` JWS (never substitute a later renewed attestation).
+3. Enqueue `{ "signup_token", "rp_attestation" }` in a durable outbox keyed by `signup_token_jti`.
+4. Return the `POST endpoints.agent_signup` response (`201`/`200`) immediately to the agent.
+5. Deliver asynchronously to the discovered `signup_receipt_endpoint` (§16.1, falling back to
+   `<issuer>/api/broker/signup-receipt`) with exponential-backoff retries. Because receipts are
+   idempotent forever on `jti` (`deduplicated: true`) and verified historically against the
+   attestation's `[iat, exp]` window at signing time, delayed retries succeed cleanly even after
+   attestation renewal or expiry.
+
+RPs implementing asynchronous Contract F delivery **SHOULD** classify outcomes using the retryability
+matrix below:
+
+| Outcome / HTTP Status | `code` (when applicable) | Action |
+| :--- | :--- | :--- |
+| Network error / timeout | — | **Retry** with exponential backoff. |
+| `429` | `rate_limited` | **Retry** with exponential backoff; respect `Retry-After` when present. |
+| `503` | `rp_broker_unavailable` | **Retry** with exponential backoff (transient trusted-broker metadata/JWKS outage). |
+| Other `5xx` | — | **Retry** with exponential backoff. |
+| `200` / `201` | — | **Terminal** (delivered or deduplicated; mark complete). |
+| `400` | `invalid_request` | **Terminal** (do not retry; fix malformed request). |
+| `401` | `invalid_attestation`, `rp_broker_untrusted`, `invalid_signup_token`, `attestation_not_valid_at_signing`, `attestation_unavailable` | **Terminal** (do not retry; cryptographic, trust, or historical-window rejection). |
+| `409` | `signup_conflict` | **Terminal** (do not retry; same `jti` submitted with conflicting body). |
 
 ---
 
@@ -1544,17 +1598,19 @@ when preparing a receipt-signed flow); it does not block attestation issuance in
 
 ### 16.1 Broker metadata
 
-`GET /.well-known/agent-broker.json`, `Content-Type: application/json`, HTTPS, no authentication. All
-six fields are **REQUIRED**:
+`GET /.well-known/agent-broker.json`, `Content-Type: application/json`, HTTPS, no authentication. Six
+core fields are **REQUIRED**, `signup_receipt_endpoint` (`v2.3.0`) is **OPTIONAL**, and unknown
+fields are not permitted (`additionalProperties: false`):
 
-| Field | Rule |
-| :--- | :--- |
-| `issuer` | Origin of the document itself; **MUST** equal the `iss` of every attestation it signs. |
-| `jwks_uri` | Absolute HTTPS URL, **same origin** as `issuer`. |
-| `attestation_status_uri` | Absolute HTTPS URL of the status endpoint. |
-| `abuse_endpoint` | Absolute HTTPS URL accepting Contract D.2 (§11.5). |
-| `protocol_versions` | Non-empty, unique, **MUST** contain `"2.0"`. |
-| `contact` | Email address or absolute HTTPS URL. |
+| Field | Requirement | Rule |
+| :--- | :--- | :--- |
+| `issuer` | REQUIRED | Origin of the document itself; **MUST** equal the `iss` of every attestation it signs. |
+| `jwks_uri` | REQUIRED | Absolute HTTPS URL (no userinfo), **same origin** as `issuer`. |
+| `attestation_status_uri` | REQUIRED | Absolute HTTPS URL (no userinfo) of the status endpoint. |
+| `abuse_endpoint` | REQUIRED | Absolute HTTPS URL (no userinfo) accepting Contract D.2 (§11.5). |
+| `signup_receipt_endpoint` | OPTIONAL (`v2.3.0`) | Absolute HTTPS URL (no userinfo) accepting Contract F authenticated signup receipts (§11.6). |
+| `protocol_versions` | REQUIRED | Non-empty, unique, **MUST** contain `"2.0"`. |
+| `contact` | REQUIRED | Email address or absolute HTTPS URL. |
 
 - `issuer` differing from the document origin **invalidates the document**. `issuer` is a canonical
   HTTPS origin, exactly like an attestation `iss` (§14.1); the localhost development exception does not
@@ -1565,11 +1621,12 @@ six fields are **REQUIRED**:
   `jwks_uri` only when the fetched document's `issuer` equals the trusted attestation `iss` and
   `jwks_uri` is HTTPS and same-origin with it; otherwise it **MUST** fall back to
   `<issuer>/.well-known/jwks.json`. A cross-origin or invalid `jwks_uri` **MUST NOT** be followed.
-  Without metadata, clients fall back to `<issuer>/.well-known/jwks.json` and
-  `<issuer>/api/broker/report-abuse`, where `<issuer>` is the assertion `iss` (Contract A) or the
+  Without metadata (or when `signup_receipt_endpoint` is omitted), clients fall back to
+  `<issuer>/.well-known/jwks.json`, `<issuer>/api/broker/report-abuse`, and
+  `<issuer>/api/broker/signup-receipt`, where `<issuer>` is the assertion `iss` (Contract A) or the
   attestation `iss` (Contract G) being verified. The fallback is a client rule, not a second format.
-- Cross-origin `attestation_status_uri` and `abuse_endpoint` are allowed but **MUST** pass the same
-  SSRF rules as §19.5; same-origin is RECOMMENDED.
+- Cross-origin `attestation_status_uri`, `abuse_endpoint`, and `signup_receipt_endpoint` are allowed
+  but **MUST** pass the same SSRF rules as §19.5; same-origin is RECOMMENDED.
 - **Broker JWKS retention.** B **MUST** keep a retired attestation-signing public key in its JWKS for
   at least 30 days after the last attestation signed with that key expires. This lets a broker verify
   a receipt presented after the attestation expired and after a broker-key rotation. A stores the
@@ -2012,11 +2069,14 @@ document, in `extensions`, or in a cached copy from another origin.
       non-conformant (`rp_attestation_removed`), and the token is never embedded inline (§14.7).
 - [ ] A document without `attestation` is still conformant and is reported as **unverified**, never
       invalid (§1.3, §18).
-- [ ] If the RP issues receipts, they are signed by a key in the attestation named by
-      `service.attestation_jti` with the `receipt` purpose, and `header.kid` equals `service.key_id`
-      (§11.4).
+- [ ] If the RP issues receipts (optional; keyless RPs remain conformant for base signup), they are
+      signed by a key in the attestation named by `service.attestation_jti` with the `receipt`
+      purpose, `header.kid` equals `service.key_id`, and Contract F delivery **SHOULD** discover
+      `signup_receipt_endpoint` from Contract I metadata and deliver asynchronously with retries
+      (§11.4, §11.6, §16.1).
 - [ ] The RP publishes `/.well-known/agent-broker.json` only if it is also an RP broker; a relying
-      party needs broker metadata only when it verifies peers or accepts abuse reports (§16).
+      party needs broker metadata only when it verifies peers, submits receipts, or accepts abuse
+      reports (§16).
 - [ ] An RP that verifies peer attestations checks the trusted-broker list **before** fetching JWKS and
       binds `rp.origin` to the fetched document origin (§14.2, §19.3).
 - [ ] The attestation is renewed on the 12-hour target against the 24-hour expiry, and a receipt's
@@ -2044,7 +2104,7 @@ and §12.5); canonical hosting remains open.
 | How does an agent verify a relying party? | Resolved in `v1.2.0` and revised in `v1.3.0`: an OPTIONAL broker-issued attestation (Contract G) is verified locally against the RP broker's JWKS (§14.2). `v1.3.0` publishes it through the `attestation` source object instead of embedding the JWT in discovery. |
 | How does a client find the attestation token? | Resolved in `v1.3.0`: the discovery `attestation` object names a stable source URI (`mode: broker` or `provider`); the source serves `{ "attestation": "<compact JWS>" }` (§14.4). Broker-managed is the default; provider-managed is an opt-in (§14.5, §14.6). |
 | Where is RP verification recorded? | Resolved in `v1.2.0`: in the `rp_verifications` ledger, not as columns on immutable consent and not as a Contract A claim (§17.2, §18). |
-| How does a client find the RP broker's JWKS, status, and abuse endpoints? | Resolved in `v1.2.0`: `/.well-known/agent-broker.json` (Contract I), with fixed-path fallbacks (§16.1). |
+| How does a client find the RP broker's JWKS, status, abuse, and signup receipt endpoints? | Resolved in `v1.2.0` and extended in `v2.3.0`: `/.well-known/agent-broker.json` (Contract I, with optional `signup_receipt_endpoint`), with fixed-path fallbacks (§16.1). |
 | How is revocation bounded without a per-signup call? | Resolved in `v1.2.0`: 24-hour expiry with a 12-hour renewal target and 60-second skew; the signed status endpoint is opt-in defense-in-depth with a 5-minute cache (§14.2, §16.2). |
 | Does a signup receipt expire? | Resolved in `v1.2.0`: no. A receipt is a historical fact valid inside the attestation window at signing time; a legacy `exp` is ignored (§11.1, §11.4). |
 | What happens to an abuse report with no linked receipt? | Resolved in `v1.2.0`: it is `unverified`, creates a case, and does not suspend the agent; only a verified, receipt-linked report can request protective suspension (§11.5). |

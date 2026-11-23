@@ -19,6 +19,8 @@ vendor catalog, provisioning, or resource surface in the protocol.
 | [`scope-boundaries.md`](./scope-boundaries.md) | Identity-vs-vendor scope rulebook, including RP identity, and the future-change checklist. |
 | [`implementing-agent-identity-protocol.md`](./implementing-agent-identity-protocol.md) | Relying Party implementation guide (provider identity, attestation modes, receipts, abuse). |
 | [`validator.md`](./validator.md) | Conformance, attestation, fixture, and registry validator guide. |
+| [`release-notes-v2.3.0.md`](./release-notes-v2.3.0.md) | Release notes for the `v2.3.0` discoverable `signup_receipt_endpoint` and async Contract F delivery release. |
+| [`release-notes-v2.2.1.md`](./release-notes-v2.2.1.md) | Release notes for the `v2.2.1` Edge/Workers compatibility patch. |
 | [`release-notes-v2.2.0.md`](./release-notes-v2.2.0.md) | Release notes for the `v2.2.0` Day-2 re-login, credential handoff, and terms re-attestation release. |
 | [`release-notes-v2.1.1.md`](./release-notes-v2.1.1.md) | Release notes for the `v2.1.1` compiled package, CLI `bin`, and documentation patch. |
 | [`release-notes-v2.1.0.md`](./release-notes-v2.1.0.md) | Release notes for the `v2.1.0` Agent Identity Protocol rename and `protocol_version: "2.0"` split. |
@@ -107,7 +109,8 @@ no private dependencies and ships compiled JavaScript in `dist/`:
   `AttestationSourceSchema`, `AttestationSourceDocumentSchema`, `RpAttestationClaimsSchema`,
   `RpAttestationKeySchema`, `RpAttestationHeaderSchema`, `AttestationStatusValueSchema`,
   `AttestationStatusClaimsSchema`, `AttestationStatusClaimsVerifierSchema`,
-  `AttestationStatusResponseSchema`, `BrokerMetadataSchema`, plus the optional `v2.2.0`
+  `AttestationStatusResponseSchema`, `BrokerMetadataSchema` (with optional `signup_receipt_endpoint`
+  in `v2.3.0`), plus the optional `v2.2.0`
   provider-to-agent Day-2 response schemas (`AgentHandoffSchema`, `HumanActionRequiredSchema`,
   `TermsReacceptanceRequiredSchema`), and the producer/verifier parsers `parseRpAttestationProducer`,
   `parseRpAttestationVerifier`, `parseAttestationSourceDocument`, and
@@ -152,6 +155,19 @@ accepted the version. The `v*` namespace is protected by the **Protect released 
 repository ruleset, which blocks updates and deletions of matching tags.
 
 ## Specification release
+
+The **`v2.3.0`** release is a strictly additive minor revision within `protocol_version: "2.0"`: it
+adds optional `signup_receipt_endpoint` to Contract I broker metadata
+(`/.well-known/agent-broker.json`, `broker-metadata.schema.json`, `BrokerMetadataSchema`, keeping
+`additionalProperties: false` enforced with this 7th optional property; cross-origin permitted under
+standard SSRF rules, same-origin recommended), documents the recommended asynchronous outbox delivery
+pattern and explicit HTTP retryability matrix for Contract F (§11.6), and reaffirms that signed
+receipts remain optional and keyless providers stay 100% conformant for base signup. See the
+[v2.3.0 release notes](./release-notes-v2.3.0.md).
+
+The **`v2.2.1`** release is an Edge/Workers compatibility patch removing `node:*` runtime imports
+from the root schema export graph (`src/schema.ts`, `src/version.ts`). See the
+[v2.2.1 release notes](./release-notes-v2.2.1.md).
 
 The **`v2.2.0`** release is a strictly additive Day-2 lifecycle revision within `protocol_version: "2.0"`:
 it adds optional `endpoints.agent_login` to discovery, Contract A additive `purpose` (`"signup" | "login"`)

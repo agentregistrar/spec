@@ -555,13 +555,16 @@ export function parseRpAttestationVerifier(value: unknown): RpAttestationClaims 
 // ===========================================================================
 
 const absoluteHttpsUrl = z.string().min(1).refine((value) => {
+  if (/\s/.test(value)) {
+    return false;
+  }
   try {
     const url = new URL(value);
     return url.protocol === "https:" && url.username === "" && url.password === "";
   } catch {
     return false;
   }
-}, { message: "must be an absolute HTTPS URL" });
+}, { message: "must be an absolute HTTPS URL with no userinfo or whitespace" });
 
 const metadataContact = z.string().min(1).refine(
   (value) => EMAIL_PATTERN.test(value) || absoluteHttpsUrl.safeParse(value).success,
@@ -569,9 +572,14 @@ const metadataContact = z.string().min(1).refine(
 );
 
 /**
- * `GET /.well-known/agent-broker.json` (spec §5.4). All six fields are REQUIRED.
- * `jwks_uri` must be same-origin with `issuer`; a cross-origin value invalidates
- * the document.
+ * `GET /.well-known/agent-broker.json` (spec §16.1). The six core fields
+ * (`issuer`, `jwks_uri`, `attestation_status_uri`, `abuse_endpoint`,
+ * `protocol_versions`, `contact`) are REQUIRED; `signup_receipt_endpoint`
+ * (v2.3.0) is OPTIONAL. Unknown fields are not permitted (`.strict()`).
+ * `jwks_uri` must be same-origin with `issuer`; a cross-origin value
+ * invalidates the document. Cross-origin `attestation_status_uri`,
+ * `abuse_endpoint`, and `signup_receipt_endpoint` are permitted under standard
+ * SSRF rules; same-origin is RECOMMENDED.
  */
 export const BrokerMetadataSchema = z
   .object({
@@ -581,6 +589,7 @@ export const BrokerMetadataSchema = z
     jwks_uri: absoluteHttpsUrl,
     attestation_status_uri: absoluteHttpsUrl,
     abuse_endpoint: absoluteHttpsUrl,
+    signup_receipt_endpoint: absoluteHttpsUrl.optional(),
     protocol_versions: z
       .array(z.string().min(1))
       .min(1)

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://docs.agentregistrar.dev/protocol/broker-metadata.schema.json",
   "title": "Agent Identity Protocol broker metadata (agent-broker.json)",
-  "description": "Contract I: the public document served at GET /.well-known/agent-broker.json. All six fields are REQUIRED and unknown fields are not permitted. `issuer` MUST equal the origin of the document itself and the `iss` of every attestation the broker signs; a differing issuer invalidates the document. `jwks_uri` MUST be same-origin with `issuer` (a cross-field rule enforced by Zod and the validator, not expressible here). Cross-origin `attestation_status_uri`/`abuse_endpoint` are allowed but must pass the same SSRF rules; same-origin is RECOMMENDED. Normative definition: agent-identity-protocol.md §16.",
+  "description": "Contract I: the public document served at GET /.well-known/agent-broker.json. Six fields (`issuer`, `jwks_uri`, `attestation_status_uri`, `abuse_endpoint`, `protocol_versions`, `contact`) are REQUIRED, `signup_receipt_endpoint` (v2.3.0) is OPTIONAL, and unknown fields are not permitted. `issuer` MUST equal the origin of the document itself and the `iss` of every attestation the broker signs; a differing issuer invalidates the document. `jwks_uri` MUST be same-origin with `issuer` (a cross-field rule enforced by Zod and the validator, not expressible here). Cross-origin `attestation_status_uri`, `abuse_endpoint`, and `signup_receipt_endpoint` are allowed but must pass the same SSRF rules; same-origin is RECOMMENDED. Normative definition: agent-identity-protocol.md §16.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -30,6 +30,10 @@
       "description": "Absolute HTTPS URL accepting Contract D.2 authenticated abuse reports.",
       "$ref": "#/$defs/httpsUrl"
     },
+    "signup_receipt_endpoint": {
+      "description": "Optional absolute HTTPS URL accepting Contract F authenticated signup receipts (v2.3.0; spec §11.6 / §16). Cross-origin is permitted under standard SSRF rules; same-origin is RECOMMENDED.",
+      "$ref": "#/$defs/httpsUrl"
+    },
     "protocol_versions": {
       "description": "Non-empty, unique list of supported Agent Identity Protocol versions; MUST contain `2.0`.",
       "type": "array",
@@ -55,10 +59,11 @@
       "pattern": "^https://[a-z0-9][a-z0-9.-]*(?::[0-9]+)?$"
     },
     "httpsUrl": {
+      "description": "Absolute HTTPS URL with no userinfo or whitespace.",
       "type": "string",
       "minLength": 1,
       "format": "uri",
-      "pattern": "^https://[^\\s]+$"
+      "pattern": "^https://[^/?#@\\s]+(?:[/?#][^\\s]*)?$"
     },
     "contact": {
       "type": "string",

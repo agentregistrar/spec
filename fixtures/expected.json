@@ -1149,6 +1149,66 @@
       }
     },
     {
+      "id": "metadata/with-signup-receipt",
+      "kind": "metadata",
+      "path": "fixtures/broker-metadata-with-signup-receipt.json",
+      "documentOrigin": "https://rp-broker.example",
+      "expect": {
+        "schema": true,
+        "zod": true,
+        "valid": true,
+        "issuerMatchesDocumentOrigin": true
+      }
+    },
+    {
+      "id": "metadata/cross-origin-signup-receipt",
+      "kind": "metadata",
+      "path": "fixtures/broker-metadata-cross-origin-signup-receipt.json",
+      "documentOrigin": "https://rp-broker.example",
+      "expect": {
+        "schema": true,
+        "zod": true,
+        "valid": true,
+        "issuerMatchesDocumentOrigin": true
+      }
+    },
+    {
+      "id": "metadata/http-signup-receipt",
+      "kind": "metadata",
+      "path": "fixtures/invalid-broker-metadata-http-signup-receipt.json",
+      "documentOrigin": "https://rp-broker.example",
+      "expect": {
+        "schema": false,
+        "zod": false,
+        "valid": false,
+        "issuerMatchesDocumentOrigin": true
+      }
+    },
+    {
+      "id": "metadata/userinfo-signup-receipt",
+      "kind": "metadata",
+      "path": "fixtures/invalid-broker-metadata-userinfo-signup-receipt.json",
+      "documentOrigin": "https://rp-broker.example",
+      "expect": {
+        "schema": false,
+        "zod": false,
+        "valid": false,
+        "issuerMatchesDocumentOrigin": true
+      }
+    },
+    {
+      "id": "metadata/unknown-property",
+      "kind": "metadata",
+      "path": "fixtures/invalid-broker-metadata-unknown-property.json",
+      "documentOrigin": "https://rp-broker.example",
+      "expect": {
+        "schema": false,
+        "zod": false,
+        "valid": false,
+        "issuerMatchesDocumentOrigin": true
+      }
+    },
+    {
       "id": "metadata/http-jwks",
       "kind": "metadata",
       "path": "fixtures/invalid-broker-metadata-http-jwks.json",

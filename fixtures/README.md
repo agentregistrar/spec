@@ -203,7 +203,12 @@ ignores additive ones.
 
 | Fixture | Expected |
 | :--- | :--- |
-| `broker-metadata.json` | valid (`issuer` = document origin, same-origin `jwks_uri`) |
+| `broker-metadata.json` | valid (`issuer` = document origin, same-origin `jwks_uri`, optional `signup_receipt_endpoint` omitted) |
+| `broker-metadata-with-signup-receipt.json` | valid (includes same-origin HTTPS `signup_receipt_endpoint`, `v2.3.0`) |
+| `broker-metadata-cross-origin-signup-receipt.json` | valid (includes cross-origin HTTPS `signup_receipt_endpoint`, permitted under standard SSRF rules, `v2.3.0`) |
+| `invalid-broker-metadata-http-signup-receipt.json` | invalid (`signup_receipt_endpoint` is not HTTPS) |
+| `invalid-broker-metadata-userinfo-signup-receipt.json` | invalid (`signup_receipt_endpoint` carries URL userinfo) |
+| `invalid-broker-metadata-unknown-property.json` | invalid (unknown 8th property rejected by `additionalProperties: false` / `.strict()`) |
 | `invalid-broker-metadata-http-jwks.json` | invalid (`jwks_uri` is not HTTPS) |
 | `invalid-broker-metadata-missing-status-uri.json` | invalid (missing `attestation_status_uri`) |
 | `invalid-broker-metadata-wrong-issuer.json` | invalid (`issuer` differs from the document origin and from `jwks_uri`'s origin) |

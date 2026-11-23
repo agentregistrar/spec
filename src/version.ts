@@ -14,4 +14,4 @@
  * `aud: "agent-identity-protocol"`).
  */
 export const VALIDATOR_ID = "agent-identity-protocol";
-export const VALIDATOR_VERSION = "2.2.1";
+export const VALIDATOR_VERSION = "2.3.0";

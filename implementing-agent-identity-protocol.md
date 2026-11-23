@@ -479,7 +479,13 @@ register a key. See §5. The three rules implementers most often get wrong:
 
 ## 12. Deliver the receipt to the broker (Contract F)
 
-`POST /api/broker/signup-receipt` with:
+Signed receipts are optional and strictly RP-signed: a keyless RP (no registered RP signing key,
+`keys: []`, or unverified) remains 100% conformant for base signup.
+
+When you do issue signed receipts, discover the broker's Contract F endpoint from
+`signup_receipt_endpoint` in `GET <issuer>/.well-known/agent-broker.json` (Contract I; cache up to
+1 hour, and fall back to `<issuer>/api/broker/signup-receipt` when metadata is absent or omits the
+field). `POST <signup_receipt_endpoint>` with:
 
 ```json
 { "signup_token": "<your compact receipt JWS>", "rp_attestation": "<the exact attestation JWS>" }
@@ -491,19 +497,39 @@ attestation (including that its `iss` is trusted by that human or by the broker 
 receipt window against the attestation using the **signing** time, verifies your key and binding,
 resolves the assertion acceptance, and records `proof_source: "rp_callback"`.
 
+### Recommended asynchronous delivery pattern (`v2.3.0`)
+
+Do **not** block `POST endpoints.agent_signup` on the broker callback. Instead:
+
+1. Persist the provider account (idempotently).
+2. Sign the Contract E receipt using your active RP key and capture that exact `rp_attestation` JWS.
+3. Enqueue `{ "signup_token", "rp_attestation" }` in a durable outbox keyed by `signup_token_jti`.
+4. Return the `POST endpoints.agent_signup` response (`201`/`200`) immediately to the agent.
+5. Deliver asynchronously to the discovered `signup_receipt_endpoint` with exponential-backoff
+   retries. Historical attestation verification and forever idempotency on `signup_token_jti`
+   (`deduplicated: true`) mean delayed retries succeed even after attestation renewal or expiry.
+
 The MCP Tier 2 path (`identity_record_signup`) carries the same two values; if the agent omits the
 attestation, the broker fetches discovery at `service.origin` and requires the presented attestation's
 `jti` to equal `service.attestation_jti`. A duplicate returns the existing row with
 `deduplicated: true`; a same-`jti` different body is `409`.
 
-| What went wrong | Response |
-| :--- | :--- |
-| Attestation broken or bound to another origin/audience | `401 invalid_attestation` |
-| Attestation issuer not trusted | `401 rp_broker_untrusted` (checked before any JWKS fetch) |
-| Receipt broken or badly signed | `401 invalid_signup_token` |
-| Receipt signed outside the attestation window | `401 attestation_not_valid_at_signing` |
-| Exact attestation no longer retrievable | `401 attestation_unavailable` (never a silent substitution) |
-| Broker metadata/JWKS outage | `503 rp_broker_unavailable` (retryable) |
+### Contract F retryability matrix (`v2.3.0`)
+
+| Outcome / Response | Meaning | Delivery action |
+| :--- | :--- | :--- |
+| Network error / timeout | Transient transport failure | **Retry** with exponential backoff |
+| `429 rate_limited` | Bounded ingestion rate exceeded | **Retry** with exponential backoff (respect `Retry-After`) |
+| `503 rp_broker_unavailable` | Transient trusted-broker metadata/JWKS outage | **Retry** with exponential backoff |
+| Other `5xx` | Transient broker server error | **Retry** with exponential backoff |
+| `200` / `201` | Recorded (or `deduplicated: true`) | **Terminal** (mark delivered) |
+| `400 invalid_request` | Missing/malformed body or non-JWS strings | **Terminal** (do not retry) |
+| `401 invalid_attestation` | Attestation broken or bound to another origin/audience | **Terminal** (do not retry) |
+| `401 rp_broker_untrusted` | Attestation issuer not trusted (checked before any JWKS fetch) | **Terminal** (do not retry) |
+| `401 invalid_signup_token` | Receipt broken or badly signed | **Terminal** (do not retry) |
+| `401 attestation_not_valid_at_signing` | Receipt signed outside the attestation window | **Terminal** (do not retry) |
+| `401 attestation_unavailable` | Exact attestation no longer retrievable (never a silent substitution) | **Terminal** (do not retry) |
+| `409 signup_conflict` | Same `jti` submitted with a different body | **Terminal** (do not retry) |
 
 ---
 
@@ -526,7 +552,9 @@ unauthenticated_report`.
 
 If you are an RP broker (or the human broker), serve `/.well-known/agent-broker.json` with `issuer`
 equal to the document origin, a same-origin `jwks_uri`, `attestation_status_uri`, `abuse_endpoint`,
-`protocol_versions` containing `"2.0"`, and a contact. Cache metadata for at most an hour
+optional `signup_receipt_endpoint` (`v2.3.0`; same-origin recommended, cross-origin permitted under
+standard SSRF rules), `protocol_versions` containing `"2.0"`, and a contact. Unknown fields are not
+permitted (`additionalProperties: false`). Cache metadata for at most an hour
 and status responses for at most five minutes. Keep retired attestation-signing keys in the JWKS for
 at least 30 days after the last attestation they signed expires.
 
@@ -574,6 +602,8 @@ broker-managed mode. `blocked` is a separate human action, not a mode, and rejec
 - Signing a receipt with a broker key, or with a key that is not the one named by
   `service.attestation_jti`/`service.key_id`.
 - Substituting your current attestation when submitting an older receipt.
+- Blocking `POST endpoints.agent_signup` on a synchronous Contract F callback instead of using an
+  asynchronous outbox, or retrying terminal `400`/`401`/`409` Contract F rejections.
 - Treating `unverified` (no attestation) and `invalid` (a bad attestation) as the same state.
 - Calling the status endpoint on every signup. Expiry is the bound; status is opt-in defense-in-depth.
 - Putting provider catalog, pricing, provisioning, or credential fields in the attestation. It binds
