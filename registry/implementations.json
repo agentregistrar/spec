@@ -5,19 +5,19 @@
   "protocol_version": "2.0",
   "spec": "agent-identity-protocol.md",
   "registry_criteria": "registry/README.md",
-  "updated_at": "2026-10-26",
+  "updated_at": "2026-11-24",
   "capability_vocabulary": [
     "agent_signup",
     "post_signup_context"
   ],
   "capability_vocabulary_note": "Protocol capabilities only. Vendor features such as provisioning, catalogs, SKUs, pricing, OTP endpoints, and resource APIs are vendor responsibilities documented in the vendor's post-signup guide, not protocol capabilities, and must never appear here.",
-  "verification_note": "OPTIONAL per-entry `verification` object (broker, level, attestation_jti, checked_at, status), validated by registry/implementations.schema.json. Conformance and verification are separate, and the object is a snapshot at checked_at. VaporCloud carries a domain-level snapshot from the live 2026-10-26 check; the registry is not a live feed and verification is not a safety or endorsement claim.",
+  "verification_note": "OPTIONAL per-entry `verification` object (broker, level, attestation_jti, checked_at, status), validated by registry/implementations.schema.json. Conformance and verification are separate, and the object is a snapshot at checked_at. Reference Provider carries a domain-level snapshot from the live 2026-11-24 check; the registry is not a live feed and verification is not a safety or endorsement claim.",
   "validator": {
     "id": "agent-identity-protocol",
-    "version": "1.2.0",
+    "version": "2.3.0",
     "script": "src/validate-discovery.ts",
     "run": "pnpm validate:discovery <url-or-file> --json",
-    "evidence_note": "The reference_run and fixture_run below are the recorded v1.0.0 release evidence, retained here as historical record. The current validator is 1.2.0; the VaporCloud entry records the live URL-mode v1.2.0 run from 2026-10-26. Its verification object is a snapshot at checked_at, not a live status feed.",
+    "evidence_note": "The reference_run and fixture_run below are the recorded v1.0.0 release evidence, retained here as historical record. The current validator is 2.3.0; the Reference Provider entry records the live URL-mode v2.3.0 run from 2026-11-24. Its verification object is a snapshot at checked_at, not a live status feed.",
     "reference_run": {
       "date": "2026-10-17",
       "command": "pnpm validate:discovery http://localhost:3001/.well-known/agent-signup.json --json",
@@ -61,49 +61,52 @@
   },
   "implementations": [
     {
-      "name": "VaporCloud",
+      "name": "Reference Provider",
       "role": "reference implementation",
-      "url": "https://skdl.dev",
-      "discovery_url": "https://skdl.dev/.well-known/agent-signup.json",
-      "discovery_url_note": "Live production discovery URL for the VaporCloud reference implementation, validated from the public internet on 2026-10-26.",
-      "audience": "vaporcloud",
+      "url": "https://reference.agentregistrardemorp.com",
+      "discovery_url": "https://reference.agentregistrardemorp.com/.well-known/agent-signup.json",
+      "discovery_url_note": "Live Demo Network discovery URL for the Reference Provider (https://github.com/agentregistrar/demo-network, Apache-2.0), validated from the public internet on 2026-11-24.",
+      "audience": "demo-reference",
       "protocol": "agent-identity-protocol",
       "protocol_version": "2.0",
       "capabilities": [
         "agent_signup",
         "post_signup_context"
       ],
-      "contact": "security@skdl.dev",
-      "post_signup_guide": "https://skdl.dev/docs/SKILL.md",
-      "validated_at": "2026-10-26",
-      "validator_version": "1.2.0",
+      "contact": "security@agentregistrardemorp.com",
+      "post_signup_guide": "https://reference.agentregistrardemorp.com/docs/SKILL.md",
+      "repo_url": "https://github.com/agentregistrar/demo-network",
+      "license": "Apache-2.0",
+      "validated_at": "2026-11-24",
+      "validator_version": "2.3.0",
       "validator_evidence": {
-        "command": "pnpm validate:discovery https://skdl.dev/.well-known/agent-signup.json --verify-attestation --require-attestation --trusted-rp-broker https://agentregistrar.dev --json",
+        "command": "npx @agentregistrar/discovery@2.3.0 validate https://reference.agentregistrardemorp.com/.well-known/agent-signup.json --verify-attestation --require-attestation --trusted-rp-broker https://alpha.agentregistrardemobroker.com --json",
         "mode": "url",
-        "source": "https://skdl.dev/.well-known/agent-signup.json",
+        "source": "https://reference.agentregistrardemorp.com/.well-known/agent-signup.json",
         "exit_code": 0,
         "valid": true,
         "counts": {
-          "passed": 23,
+          "passed": 24,
           "failed": 0,
-          "warnings": 0,
+          "warnings": 1,
           "probes": 0
         },
         "observed": {
-          "protocol": "agent-identity-v1",
-          "audience": "vaporcloud",
-          "providerName": "VaporCloud",
+          "protocol": "agent-identity-protocol",
+          "protocolVersion": "2.0",
+          "audience": "demo-reference",
+          "providerName": "Reference Provider",
           "attestation_status": "verified",
           "attestation_level": "domain",
-          "attestation_jti": "rpa_01m5vggft4vn3x9bfw9wy6b8zn"
+          "attestation_jti": "rpa_01m87dpx51zqxqp097t7w8p1sp"
         },
-        "note": "Live URL-mode v1.2.0 run on 2026-10-26: 23 checks passed, 0 failed, 0 warnings; the attestation verified against https://agentregistrar.dev/.well-known/jwks.json at 2026-10-26T07:23:40.000Z. The verification object below is the snapshot from this check."
+        "note": "Live URL-mode v2.3.0 run on 2026-11-24: 24 checks passed, 0 failed, 1 warning (transport.cache-control); the attestation verified against https://alpha.agentregistrardemobroker.com/.well-known/jwks.json at 2026-11-24T18:57:48.000Z. The verification object below is the snapshot from this check."
       },
       "verification": {
-        "broker": "https://agentregistrar.dev",
+        "broker": "https://alpha.agentregistrardemobroker.com",
         "level": "domain",
-        "attestation_jti": "rpa_01m5vggft4vn3x9bfw9wy6b8zn",
-        "checked_at": "2026-10-26T07:23:40.000Z",
+        "attestation_jti": "rpa_01m87dpx51zqxqp097t7w8p1sp",
+        "checked_at": "2026-11-24T18:57:48.000Z",
         "status": "active"
       }
     }

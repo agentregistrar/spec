@@ -76,22 +76,24 @@ solvency, or conduct.
 Meeting these criteria is a statement about the **discovery document only**. It is **not** a broker
 endorsement of the implementation's product, security posture, uptime, or pricing (see §6).
 
-**Reference entry.** VaporCloud now meets criterion 2: its entry uses the live
-`https://skdl.dev/.well-known/agent-signup.json` and was re-validated from the public internet on
-2026-10-26. The earlier `.example`/local-run exception is retired.
+**Reference entry.** Reference Provider meets criterion 2: its entry uses the live
+`https://reference.agentregistrardemorp.com/.well-known/agent-signup.json` from the open-source
+[Demo Network](https://github.com/agentregistrar/demo-network) (`https://agentregistrardemobroker.com`)
+and was validated from the public internet on 2026-11-24.
 
-**Live re-validation (2026-10-26).** The deployed reference implementation was validated with the
-conformance validator:
+**Live validation (2026-11-24).** The deployed reference implementation was validated with the
+conformance validator (`@agentregistrar/discovery@2.3.0`):
 
 ```bash
-npx @agentregistrar/discovery validate https://skdl.dev/.well-known/agent-signup.json \
+npx @agentregistrar/discovery@2.3.0 validate https://reference.agentregistrardemorp.com/.well-known/agent-signup.json \
   --verify-attestation --require-attestation \
-  --trusted-rp-broker https://agentregistrar.dev --json
+  --trusted-rp-broker https://alpha.agentregistrardemobroker.com --json
 ```
 
-Result: `valid: true`, exit `0`, zero errors, zero warnings, **23 checks passed**, and the attestation
-verified at level `domain` against `https://agentregistrar.dev/.well-known/jwks.json`. The entry in
-§3 records this run and the five-field `verification` snapshot.
+Result: `valid: true`, exit `0`, zero errors, 1 warning (`transport.cache-control`), **24 checks passed**,
+and the attestation verified at level `domain` against
+`https://alpha.agentregistrardemobroker.com/.well-known/jwks.json`. The entry in §3 records this run
+and the five-field `verification` snapshot.
 
 ## 3. Registered implementations
 
@@ -101,27 +103,30 @@ capabilities only; vendor features are never listed.
 
 | Implementation | Discovery URL | Audience | Protocol | Capabilities | Contact | Validated | Verification |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **VaporCloud** (reference) | `https://skdl.dev/.well-known/agent-signup.json` | `vaporcloud` | `agent-identity-protocol` | `agent_signup`, `post_signup_context` | `security@skdl.dev` | 2026-10-26 | verified (domain) |
+| **Reference Provider** (reference) | `https://reference.agentregistrardemorp.com/.well-known/agent-signup.json` | `demo-reference` | `agent-identity-protocol` | `agent_signup`, `post_signup_context` | `security@agentregistrardemorp.com` | 2026-11-24 | verified (domain) |
 
 Registry metadata (validator version, exact commands, and observed protocol/audience) lives in the
 machine-readable file. Each entry's `validator_evidence` records the concrete command and result.
 
-VaporCloud's `verification` object records broker `https://agentregistrar.dev`, level `domain`,
-attestation jti `rpa_01m5vggft4vn3x9bfw9wy6b8zn`, `checked_at` `2026-10-26T07:23:40.000Z`, and
-`status:"active"`. It is a **snapshot**, not a live status feed; the attestation source named by
-discovery is the live proof, and verification is identity, not safety or endorsement.
+Reference Provider's `verification` object records broker `https://alpha.agentregistrardemobroker.com`,
+level `domain`, attestation jti `rpa_01m87dpx51zqxqp097t7w8p1sp`, `checked_at`
+`2026-11-24T18:57:48.000Z`, and `status:"active"`. It is a **snapshot**, not a live status feed;
+the attestation source named by discovery is the live proof, and verification is identity, not
+safety or endorsement.
 
-**Live origin.** VaporCloud's `discovery_url` and `validator_evidence.source` are both the public
-`https://skdl.dev/.well-known/agent-signup.json`; the recorded run was URL-mode from the public
-internet.
+**Live origin.** Reference Provider's `discovery_url` and `validator_evidence.source` are both the
+public `https://reference.agentregistrardemorp.com/.well-known/agent-signup.json`; the recorded run
+was URL-mode from the public internet.
 
-### Reference implementation: VaporCloud
+### Reference implementation: Reference Provider
 
-VaporCloud is the reference Relying Party. Its identity-only discovery document is built to the
-shared schema and served at `https://skdl.dev/.well-known/agent-signup.json`. Its vendor features
-(catalog, provisioning API, legacy OTP fallback, admin actions) are documented in its post-signup
-guide at `https://skdl.dev/docs/SKILL.md`, reached through the signed `context` pointer — they are
-**not** part of discovery and **not** registry capabilities.
+Reference Provider is the open-source reference Relying Party from the
+[Agent Registrar Demo Network](https://github.com/agentregistrar/demo-network) (Apache-2.0, hub at
+`https://agentregistrardemobroker.com`). Its identity-only discovery document is built to the shared
+schema and served at `https://reference.agentregistrardemorp.com/.well-known/agent-signup.json`. Its
+demo features (widget API, Day-2 login, step-up approval, and abuse reporting) are documented in its
+post-signup guide at `https://reference.agentregistrardemorp.com/docs/SKILL.md`, reached through the
+signed `context` pointer — they are **not** part of discovery and **not** registry capabilities.
 
 ## 4. How to submit an entry
 
