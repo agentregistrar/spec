@@ -1,9 +1,11 @@
 # Agent Identity Protocol — Specification
 
-The public, canonical home of the **`agent-identity-protocol`** protocol: the relying-party discovery
+The public, canonical source of the **`agent-identity-protocol`** protocol: the relying-party discovery
 contract, the brokered signup handshake, the RP attestation and authenticated reporting contracts,
 the JSON Schemas, the conformance/attestation fixtures, the validators, and the implementation
 registry.
+
+**Protocol website & rendered specification:** <https://agentidentityprotocol.dev>
 
 [Agent Registrar](https://agentregistrar.dev) is the protocol and brokerage service behind Agent
 Identity. A Relying Party (RP) publishes an identity-only discovery document that names an optional
@@ -226,21 +228,18 @@ process are recorded in their release notes.
 
 ## Documentation
 
-This repository remains the canonical location of the specification. The rendered protocol pages are
-generated from the released specification:
+This repository is the canonical source of the specification. The rendered protocol pages are
+published at <https://agentidentityprotocol.dev>, generated from tagged releases:
 
-- Rendered specification: <https://docs.agentregistrar.dev/protocol/specification/>
-- Scope boundaries: <https://docs.agentregistrar.dev/protocol/scope-boundaries/>
-- Implementation guide: <https://docs.agentregistrar.dev/protocol/implementation-guide/>
-- Validator guide: <https://docs.agentregistrar.dev/protocol/validator/>
-- Changelog: <https://docs.agentregistrar.dev/protocol/changelog/>
-- JSON Schema (discovery): <https://docs.agentregistrar.dev/protocol/agent-signup.schema.json>
-- JSON Schema (attestation source): <https://docs.agentregistrar.dev/protocol/attestation-source.schema.json>
-- JSON Schema (RP attestation): <https://docs.agentregistrar.dev/protocol/rp-attestation.schema.json>
-- JSON Schema (broker metadata): <https://docs.agentregistrar.dev/protocol/broker-metadata.schema.json>
-- JSON Schema (attestation status): <https://docs.agentregistrar.dev/protocol/attestation-status.schema.json>
-- JSON Schema (signup receipt): <https://docs.agentregistrar.dev/protocol/signup-receipt.schema.json>
-- JSON Schema (abuse report): <https://docs.agentregistrar.dev/protocol/abuse-report.schema.json>
+- Protocol website: <https://agentidentityprotocol.dev>
+- Rendered specification: <https://agentidentityprotocol.dev/spec/v2.3/>
+- Scope boundaries: <https://agentidentityprotocol.dev/scope-boundaries/>
+- Implementation guide: <https://agentidentityprotocol.dev/implement/>
+- Validator guide: <https://agentidentityprotocol.dev/validate/>
+- Release notes & changelog: <https://agentidentityprotocol.dev/releases/>
+- FAQ: <https://agentidentityprotocol.dev/faq/>
+- JSON Schemas (static downloads): <https://agentidentityprotocol.dev/schemas/agent-signup.schema.json>
+  (current schema `$id`s remain served at `https://docs.agentregistrar.dev/protocol/*.schema.json`)
 - Usage and integration guides: <https://docs.agentregistrar.dev>
 - Agent Registrar product and service: <https://agentregistrar.dev>
 
